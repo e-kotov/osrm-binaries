@@ -80,6 +80,24 @@ jobs:
           cp osrm-backend/build/osrm-customize package/${{ matrix.artifact_name }}/
           cp osrm-backend/build/osrm-partition package/${{ matrix.artifact_name }}/
           cp -r osrm-backend/profiles package/${{ matrix.artifact_name }}/
+          
+          # Bundle TBB and patch RPATH for macOS
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            cp $(brew --prefix tbb)/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              install_name_tool -add_rpath @loader_path package/${{ matrix.artifact_name }}/$exe || true
+            done
+          fi
+          
+          # Bundle TBB and patch RPATH for Linux
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get install -y patchelf
+            cp /usr/lib/*/libtbb.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              patchelf --set-rpath '$ORIGIN' package/${{ matrix.artifact_name }}/$exe || true
+            done
+          fi
+
           cd package
           tar -czvf ${{ matrix.artifact_name }}.tar.gz ${{ matrix.artifact_name }}
 

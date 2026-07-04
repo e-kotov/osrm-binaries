@@ -41,9 +41,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
-            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libflatbuffers-dev flatbuffers-compiler
+            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libflatbuffers-dev flatbuffers-compiler libprotozero-dev
             
-      - name: Install sol2 (Linux)
+      - name: Install sol2 and fix flatbuffers (Linux)
         if: runner.os == 'Linux'
         run: |
           git clone --depth 1 -b v3.3.1 https://github.com/ThePhD/sol2.git /tmp/sol2
@@ -51,11 +51,17 @@ jobs:
           mkdir build && cd build
           cmake ..
           sudo cmake --install .
-
+          
+          # Fix case-sensitive find_package for flatbuffers on Ubuntu
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "aarch64" ]; then LIB_DIR="aarch64-linux-gnu"; else LIB_DIR="x86_64-linux-gnu"; fi
+          sudo ln -sf /usr/lib/$LIB_DIR/cmake/flatbuffers/FlatBuffersConfig.cmake /usr/lib/$LIB_DIR/cmake/flatbuffers/flatbuffersConfig.cmake || true
+          sudo ln -sf /usr/lib/$LIB_DIR/cmake/flatbuffers/FlatBuffersConfigVersion.cmake /usr/lib/$LIB_DIR/cmake/flatbuffers/flatbuffersConfigVersion.cmake || true
+          
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'

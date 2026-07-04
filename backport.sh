@@ -2,10 +2,8 @@
 
 # List of all the historical versions you want to automatically build
 VERSIONS=(
-  "v5.27.1"
-  "v6.0.0"
-  "v26.4.0"
-  "v26.4.1"
+
+
   "v26.5.0"
   "v26.6.0"
   "v26.6.1"

@@ -41,12 +41,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
-            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev sol2-dev
+            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libflatbuffers-dev flatbuffers-compiler
             
+      - name: Install sol2 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone --depth 1 -b v3.3.1 https://github.com/ThePhD/sol2.git /tmp/sol2
+          cd /tmp/sol2
+          mkdir build && cd build
+          cmake ..
+          sudo cmake --install .
+
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'

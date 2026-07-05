@@ -67,6 +67,11 @@ jobs:
         run: |
           python3 -c "
           import sys, glob
+          with open('osrm-backend/CMakeLists.txt', 'r') as f:
+              c = f.read()
+          c = c.replace(' /opt/homebrew', '')
+          with open('osrm-backend/CMakeLists.txt', 'w') as f:
+              f.write(c)
           with open('osrm-backend/include/util/packed_vector.hpp', 'r') as f:
               content = f.read()
           content = content.replace('std::atomic_ref<uint64_t> atomic_ref(*ptr);', 'return __atomic_compare_exchange_n(ptr, &old_value, new_value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);')

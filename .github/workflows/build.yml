@@ -130,10 +130,13 @@ jobs:
             if [ "${{ matrix.arch }}" == "x64" ]; then
               unset LDFLAGS
               unset CPPFLAGS
+              unset C_INCLUDE_PATH
+              unset CPLUS_INCLUDE_PATH
+              export PATH=$(echo $PATH | sed -e 's|/opt/homebrew/bin:||g' -e 's|/opt/homebrew/sbin:||g')
               export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-              export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:$PKG_CONFIG_PATH"
-              export CPATH="/usr/local/opt/libarchive/include:$CPATH"
-              export LIBRARY_PATH="/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
+              export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig"
+              export CPATH="/usr/local/opt/libarchive/include"
+              export LIBRARY_PATH="/usr/local/opt/libarchive/lib"
               export MACOSX_DEPLOYMENT_TARGET="13.0"
               CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_IGNORE_PATH=/opt/homebrew"
             else

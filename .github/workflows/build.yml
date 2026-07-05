@@ -126,8 +126,8 @@ jobs:
               c = re.sub(r'find_package\(Boost 1\.\d+ REQUIRED', 'find_package(Boost 1.60 REQUIRED', c)
               with open('osrm-backend/CMakeLists.txt', 'w', encoding='utf-8') as f: f.write(c)
           except: pass
-          rm -f osrm-backend/cmake/FindLua.cmake
           "
+          rm -f osrm-backend/cmake/FindLua.cmake
           find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\
           #include <cstdint>\
           #include <string>\

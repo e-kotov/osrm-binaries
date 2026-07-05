@@ -122,10 +122,11 @@ jobs:
               except: pass
           try:
               with open('osrm-backend/CMakeLists.txt', 'r', encoding='utf-8') as f: c = f.read()
-              c = re.sub(r'set\(BOOST_COMPONENTS(.*?)\)', lambda m: 'set(BOOST_COMPONENTS' + re.sub(r'\b(system|thread)\b', '', m.group(1)) + ')', c)
+              c = re.sub(r'set\(BOOST_COMPONENTS(.*?)\)', lambda m: 'set(BOOST_COMPONENTS' + re.sub(r'\bsystem\b', '', m.group(1)) + ')', c)
               c = re.sub(r'find_package\(Boost 1\.\d+ REQUIRED', 'find_package(Boost 1.60 REQUIRED', c)
               with open('osrm-backend/CMakeLists.txt', 'w', encoding='utf-8') as f: f.write(c)
           except: pass
+          rm -f osrm-backend/cmake/FindLua.cmake
           "
           find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\
           #include <cstdint>\

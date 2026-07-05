@@ -25,7 +25,7 @@ jobs:
           - os: macos-15
             arch: arm64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
-          - os: macos-15
+          - os: macos-13
             arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: windows-2022
@@ -145,7 +145,7 @@ jobs:
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          vcpkg install bzip2 boost-system boost-thread boost-iostreams boost-date-time boost-filesystem boost-program-options boost-regex boost-test boost-interprocess expat stxxl lua tbb --triplet x64-windows
+          vcpkg install bzip2 boost expat stxxl lua tbb --triplet x64-windows
 
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'

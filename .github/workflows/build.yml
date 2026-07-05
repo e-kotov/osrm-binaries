@@ -113,9 +113,9 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" == "x64" ]; then
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            arch -x86_64 /usr/local/bin/brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+            arch -x86_64 /usr/local/bin/brew install cmake pkg-config boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
           else
-            brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+            brew install cmake pkg-config boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
           fi
 
       - name: Install Dependencies (Windows)
@@ -128,11 +128,14 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
             if [ "${{ matrix.arch }}" == "x64" ]; then
+              unset LDFLAGS
+              unset CPPFLAGS
               export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+              export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:$PKG_CONFIG_PATH"
               export CPATH="/usr/local/opt/libarchive/include:$CPATH"
               export LIBRARY_PATH="/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
               export MACOSX_DEPLOYMENT_TARGET="13.0"
-              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64"
+              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_IGNORE_PATH=/opt/homebrew"
             else
               export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
               export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"

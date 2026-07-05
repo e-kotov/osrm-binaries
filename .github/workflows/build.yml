@@ -69,20 +69,46 @@ jobs:
           git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
           sudo cp -r /tmp/vtzero/include/vtzero /usr/local/include/
           
-      - name: Patch OSRM Source (Fix std::atomic_ref)
+      - name: Patch OSRM Source (Fix std::atomic_ref, GCC 11 visit, MSVC count)
         if: runner.os != 'Windows'
         run: |
           python3 -c "
-          import sys
+          import sys, glob
           with open('osrm-backend/include/util/packed_vector.hpp', 'r') as f:
               content = f.read()
           content = content.replace('std::atomic_ref<uint64_t> atomic_ref(*ptr);', 'return __atomic_compare_exchange_n(ptr, &old_value, new_value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);')
           content = content.replace('return atomic_ref.compare_exchange_strong(old_value, new_value, std::memory_order_seq_cst);', '')
           with open('osrm-backend/include/util/packed_vector.hpp', 'w') as f:
               f.write(content)
+          with open('osrm-backend/include/util/json_renderer.hpp', 'r') as f:
+              c = f.read()
+          c = c.replace('std::visit(Renderer(out)', 'std::visit<void>(Renderer(out)')
+          with open('osrm-backend/include/util/json_renderer.hpp', 'w') as f:
+              f.write(c)
+          for file in glob.glob('osrm-backend/src/**/*.cpp', recursive=True):
+              with open(file, 'r') as f:
+                  c = f.read()
+              c = c.replace('option_variables.contains(', 'option_variables.count(')
+              with open(file, 'w') as f:
+                  f.write(c)
           "
           sed -i.bak 's/find_package(Boost 1.83 REQUIRED/find_package(Boost 1.60 REQUIRED/g' osrm-backend/CMakeLists.txt
           sed -i.bak 's/set(BOOST_COMPONENTS /set(BOOST_COMPONENTS regex /g' osrm-backend/CMakeLists.txt
+
+      - name: Patch OSRM Source (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python3 -c "
+          import sys, glob
+          for file in glob.glob('osrm-backend/src/**/*.cpp', recursive=True):
+              with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                  c = f.read()
+              if 'option_variables.contains(' in c:
+                  c = c.replace('option_variables.contains(', 'option_variables.count(')
+                  with open(file, 'w', encoding='utf-8') as f:
+                      f.write(c)
+          "
+
 
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'

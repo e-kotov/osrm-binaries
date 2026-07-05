@@ -81,6 +81,8 @@ jobs:
           with open('osrm-backend/include/util/packed_vector.hpp', 'w') as f:
               f.write(content)
           "
+          sed -i.bak 's/find_package(Boost 1.83 REQUIRED/find_package(Boost 1.60 REQUIRED/g' osrm-backend/CMakeLists.txt
+          sed -i.bak 's/set(BOOST_COMPONENTS /set(BOOST_COMPONENTS regex /g' osrm-backend/CMakeLists.txt
 
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'

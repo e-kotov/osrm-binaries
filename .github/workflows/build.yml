@@ -179,6 +179,7 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ]; then
             export CXXFLAGS="-Wno-error -Wno-deprecated-copy"
             export CFLAGS="-Wno-error"
+              export LUA_DIR="/usr/local/opt/lua@5.4"
           else
             export CXXFLAGS="$CXXFLAGS -Wno-error -Wno-deprecated-copy"
           fi

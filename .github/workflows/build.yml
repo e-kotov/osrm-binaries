@@ -189,7 +189,7 @@ jobs:
               unset CPLUS_INCLUDE_PATH
               export PATH=$(echo $PATH | sed -e 's|/opt/homebrew/bin:||g' -e 's|/opt/homebrew/sbin:||g')
               export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-              export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig"
+              export PKG_CONFIG_PATH="/usr/local/opt/lua@5.4/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig"
               export CPATH="/usr/local/opt/libarchive/include"
               export LIBRARY_PATH="/usr/local/opt/libarchive/lib"
               export MACOSX_DEPLOYMENT_TARGET="14.0"

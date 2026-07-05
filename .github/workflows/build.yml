@@ -17,12 +17,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
+            arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
           - os: ubuntu-24.04-arm
+            arch: arm64
             artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
           - os: macos-15
+            arch: arm64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
+          - os: macos-15
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: windows-2022
+            arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
 
     steps:
@@ -116,7 +123,12 @@ jobs:
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+          if [ "${{ matrix.arch }}" == "x64" ]; then
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            arch -x86_64 /usr/local/bin/brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+          else
+            brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+          fi
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
@@ -127,10 +139,17 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            export CPATH="/opt/homebrew/opt/libarchive/include:/usr/local/opt/libarchive/include:$CPATH"
-            export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
-            export MACOSX_DEPLOYMENT_TARGET="13.0"
-            CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
+            if [ "${{ matrix.arch }}" == "x64" ]; then
+              export CPATH="/usr/local/opt/libarchive/include:$CPATH"
+              export LIBRARY_PATH="/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
+              export MACOSX_DEPLOYMENT_TARGET="13.0"
+              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64"
+            else
+              export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
+              export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"
+              export MACOSX_DEPLOYMENT_TARGET="13.0"
+              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
+            fi
           fi
           cd osrm-backend
           mkdir build && cd build
@@ -159,7 +178,11 @@ jobs:
           
           # Bundle TBB and patch RPATH for macOS
           if [ "$RUNNER_OS" == "macOS" ]; then
-            cp $(brew --prefix tbb)/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
+            if [ "${{ matrix.arch }}" == "x64" ]; then
+              cp /usr/local/opt/tbb/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
+            else
+              cp $(brew --prefix tbb)/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
+            fi
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
               install_name_tool -add_rpath @loader_path package/${{ matrix.artifact_name }}/$exe || true
             done

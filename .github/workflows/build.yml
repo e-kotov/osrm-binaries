@@ -82,10 +82,12 @@ jobs:
               f.write(content)
           with open('osrm-backend/include/util/json_renderer.hpp', 'r') as f:
               c = f.read()
-          c = c.replace('std::visit<void>(Renderer(out), it->second);', 'std::visit([&](auto&& arg) { Renderer(out)(arg); }, it->second);')
-          c = c.replace('std::visit<void>(Renderer(out), *it);', 'std::visit([&](auto&& arg) { Renderer(out)(arg); }, *it);')
-          c = c.replace('std::visit(Renderer(out), it->second);', 'std::visit([&](auto&& arg) { Renderer(out)(arg); }, it->second);')
-          c = c.replace('std::visit(Renderer(out), *it);', 'std::visit([&](auto&& arg) { Renderer(out)(arg); }, *it);')
+          c = c.replace('std::visit([&](auto&& arg) { Renderer(out)(arg); }, it->second);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, it->second);')
+          c = c.replace('std::visit([&](auto&& arg) { Renderer(out)(arg); }, *it);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, *it);')
+          c = c.replace('std::visit<void>(Renderer(out), it->second);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, it->second);')
+          c = c.replace('std::visit<void>(Renderer(out), *it);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, *it);')
+          c = c.replace('std::visit(Renderer(out), it->second);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, it->second);')
+          c = c.replace('std::visit(Renderer(out), *it);', 'std::visit([this](auto&& arg) -> int { (*this)(arg); return 0; }, *it);')
           with open('osrm-backend/include/util/json_renderer.hpp', 'w') as f:
               f.write(c)
           for file in glob.glob('osrm-backend/src/**/*.cpp', recursive=True):

@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
           - os: ubuntu-24.04-arm
             artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
@@ -24,7 +24,7 @@ jobs:
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: macos-15
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
-          - os: windows-2019
+          - os: windows-2022
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
 
     steps:

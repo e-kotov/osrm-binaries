@@ -22,7 +22,7 @@ jobs:
             artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
           - os: macos-13
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
-          - os: macos-14
+          - os: macos-15
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
           - os: windows-2019
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
@@ -41,11 +41,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
-            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev libosmium2-dev
+            libzip-dev libboost-all-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev libosmium2-dev
             
-      - name: Install sol2, flatbuffers, vtzero (Linux)
+      - name: Install sol2, flatbuffers, vtzero, lua5.4 (Linux)
         if: runner.os == 'Linux'
         run: |
+          curl -R -O http://www.lua.org/ftp/lua-5.4.6.tar.gz
+          tar zxf lua-5.4.6.tar.gz
+          cd lua-5.4.6
+          make all test
+          sudo make install
+          cd ..
+          sudo ldconfig
           git clone --depth 1 -b v3.3.1 https://github.com/ThePhD/sol2.git /tmp/sol2
           cd /tmp/sol2
           mkdir build && cd build
@@ -65,7 +72,7 @@ jobs:
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium llvm@18
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
@@ -76,8 +83,12 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
-            export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
-            export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"
+            export CPATH="/opt/homebrew/opt/libarchive/include:/usr/local/opt/libarchive/include:$CPATH"
+            export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
+            export MACOSX_DEPLOYMENT_TARGET="13.0"
+            export CC="$(brew --prefix llvm@18)/bin/clang"
+            export CXX="$(brew --prefix llvm@18)/bin/clang++"
+            export LDFLAGS="-L$(brew --prefix llvm@18)/lib/c++ -Wl,-rpath,$(brew --prefix llvm@18)/lib/c++"
             CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
           fi
           cd osrm-backend

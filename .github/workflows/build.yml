@@ -144,11 +144,12 @@ jobs:
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          vcpkg install bzip2 boost-system boost-thread boost-iostreams boost-date-time boost-filesystem boost-program-options boost-regex boost-test expat stxxl lua tbb --triplet x64-windows
+          vcpkg install bzip2 boost-system boost-thread boost-iostreams boost-date-time boost-filesystem boost-program-options boost-regex boost-test boost-interprocess expat stxxl lua tbb --triplet x64-windows
 
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
         run: |
+          export CXXFLAGS="$CXXFLAGS -Wno-error -Wno-deprecated-copy"
           if [ "$RUNNER_OS" = "macOS" ]; then
             if [ "${{ matrix.arch }}" == "x64" ]; then
               unset LDFLAGS

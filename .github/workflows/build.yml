@@ -154,7 +154,12 @@ jobs:
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
         run: |
-          export CXXFLAGS="$CXXFLAGS -Wno-error -Wno-deprecated-copy"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            export CXXFLAGS="-Wno-error -Wno-deprecated-copy"
+            export CFLAGS="-Wno-error"
+          else
+            export CXXFLAGS="$CXXFLAGS -Wno-error -Wno-deprecated-copy"
+          fi
           if [ "$RUNNER_OS" = "macOS" ]; then
             if [ "${{ matrix.arch }}" == "x64" ]; then
               unset LDFLAGS

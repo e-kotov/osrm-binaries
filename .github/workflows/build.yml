@@ -46,7 +46,7 @@ jobs:
       - name: Install sol2, flatbuffers, vtzero, lua5.4 (Linux)
         if: runner.os == 'Linux'
         run: |
-          curl -R -O http://www.lua.org/ftp/lua-5.4.6.tar.gz
+          curl -R -L -O https://www.lua.org/ftp/lua-5.4.6.tar.gz
           tar zxf lua-5.4.6.tar.gz
           cd lua-5.4.6
           make all test
@@ -69,10 +69,23 @@ jobs:
           git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
           sudo cp -r /tmp/vtzero/include/vtzero /usr/local/include/
           
+      - name: Patch OSRM Source (Fix std::atomic_ref)
+        if: runner.os != 'Windows'
+        run: |
+          python3 -c "
+          import sys
+          with open('osrm-backend/include/util/packed_vector.hpp', 'r') as f:
+              content = f.read()
+          content = content.replace('std::atomic_ref<uint64_t> atomic_ref(*ptr);', 'return __atomic_compare_exchange_n(ptr, &old_value, new_value, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);')
+          content = content.replace('return atomic_ref.compare_exchange_strong(old_value, new_value, std::memory_order_seq_cst);', '')
+          with open('osrm-backend/include/util/packed_vector.hpp', 'w') as f:
+              f.write(content)
+          "
+
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium llvm@18
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
@@ -86,9 +99,6 @@ jobs:
             export CPATH="/opt/homebrew/opt/libarchive/include:/usr/local/opt/libarchive/include:$CPATH"
             export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:/usr/local/opt/libarchive/lib:$LIBRARY_PATH"
             export MACOSX_DEPLOYMENT_TARGET="13.0"
-            export CC="$(brew --prefix llvm@18)/bin/clang"
-            export CXX="$(brew --prefix llvm@18)/bin/clang++"
-            export LDFLAGS="-L$(brew --prefix llvm@18)/lib/c++ -Wl,-rpath,$(brew --prefix llvm@18)/lib/c++"
             CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
           fi
           cd osrm-backend

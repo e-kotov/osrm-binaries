@@ -41,7 +41,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
-            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev
+            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev libosmium2-dev
             
       - name: Install sol2, flatbuffers, vtzero (Linux)
         if: runner.os == 'Linux'
@@ -56,18 +56,20 @@ jobs:
           cd /tmp/flatbuffers
           mkdir build && cd build
           cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF
+          cmake --build .
           sudo cmake --install .
           
           git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
           cd /tmp/vtzero
           mkdir build && cd build
           cmake .. -DVTZERO_BUILD_TESTS=OFF
+          cmake --build .
           sudo cmake --install .
           
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'

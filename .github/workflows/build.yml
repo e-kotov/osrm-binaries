@@ -113,6 +113,9 @@ jobs:
                       with open(file, 'w', encoding='utf-8') as f: f.write(c.replace('-Werror', ''))
               except: pass
           "
+          find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\
+          #include <cstdint>
+          ' {}
           sed -i.bak 's/find_package(Boost 1.83 REQUIRED/find_package(Boost 1.60 REQUIRED/g' osrm-backend/CMakeLists.txt
           sed -i.bak 's/set(BOOST_COMPONENTS /set(BOOST_COMPONENTS regex /g' osrm-backend/CMakeLists.txt
           echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
@@ -122,13 +125,14 @@ jobs:
         run: |
           python3 -c "
           import sys, glob
-          for file in glob.glob('osrm-backend/src/**/*.cpp', recursive=True):
+          for file in glob.glob('osrm-backend/**/*.cpp', recursive=True) + glob.glob('osrm-backend/**/*.hpp', recursive=True):
               with open(file, 'r', encoding='utf-8', errors='ignore') as f:
                   c = f.read()
+              c = '#include <cstdint>\n' + c
               if 'option_variables.contains(' in c:
                   c = c.replace('option_variables.contains(', 'option_variables.count(')
-                  with open(file, 'w', encoding='utf-8') as f:
-                      f.write(c)
+              with open(file, 'w', encoding='utf-8') as f:
+                  f.write(c)
           "
 
 

@@ -115,6 +115,7 @@ jobs:
           "
           sed -i.bak 's/find_package(Boost 1.83 REQUIRED/find_package(Boost 1.60 REQUIRED/g' osrm-backend/CMakeLists.txt
           sed -i.bak 's/set(BOOST_COMPONENTS /set(BOOST_COMPONENTS regex /g' osrm-backend/CMakeLists.txt
+          echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
 
       - name: Patch OSRM Source (Windows)
         if: runner.os == 'Windows'
@@ -162,12 +163,12 @@ jobs:
               export CPATH="/usr/local/opt/libarchive/include"
               export LIBRARY_PATH="/usr/local/opt/libarchive/lib"
               export MACOSX_DEPLOYMENT_TARGET="14.0"
-              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_IGNORE_PATH=/opt/homebrew -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_CXX_FLAGS='-Wno-error -Wno-deprecated-copy'"
+              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_IGNORE_PATH=/opt/homebrew -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
             else
               export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
               export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"
               export MACOSX_DEPLOYMENT_TARGET="14.0"
-              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_CXX_FLAGS='-Wno-error -Wno-deprecated-copy'"
+              CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
             fi
           fi
           cd osrm-backend

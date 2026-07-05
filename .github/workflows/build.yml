@@ -60,11 +60,7 @@ jobs:
           sudo cmake --install .
           
           git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
-          cd /tmp/vtzero
-          mkdir build && cd build
-          cmake .. -DVTZERO_BUILD_TESTS=OFF
-          cmake --build .
-          sudo cmake --install .
+          sudo cp -r /tmp/vtzero/include/vtzero /usr/local/include/
           
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
@@ -79,13 +75,14 @@ jobs:
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
         run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
+            export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"
+            CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
+          fi
           cd osrm-backend
           mkdir build && cd build
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off"
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib"
-          fi
-          cmake .. $CMAKE_ARGS
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off $CMAKE_ARGS
           make -j$(nproc || sysctl -n hw.ncpu)
           
       - name: Build (Windows)

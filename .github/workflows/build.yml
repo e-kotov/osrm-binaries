@@ -41,9 +41,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
-            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libflatbuffers-dev flatbuffers-compiler libprotozero-dev
+            libzip-dev libboost-all-dev lua5.2 liblua5.2-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev
             
-      - name: Install sol2 and fix flatbuffers (Linux)
+      - name: Install sol2, flatbuffers, vtzero (Linux)
         if: runner.os == 'Linux'
         run: |
           git clone --depth 1 -b v3.3.1 https://github.com/ThePhD/sol2.git /tmp/sol2
@@ -52,16 +52,22 @@ jobs:
           cmake ..
           sudo cmake --install .
           
-          # Fix case-sensitive find_package for flatbuffers on Ubuntu
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "aarch64" ]; then LIB_DIR="aarch64-linux-gnu"; else LIB_DIR="x86_64-linux-gnu"; fi
-          sudo ln -sf /usr/lib/$LIB_DIR/cmake/flatbuffers/FlatBuffersConfig.cmake /usr/lib/$LIB_DIR/cmake/flatbuffers/flatbuffersConfig.cmake || true
-          sudo ln -sf /usr/lib/$LIB_DIR/cmake/flatbuffers/FlatBuffersConfigVersion.cmake /usr/lib/$LIB_DIR/cmake/flatbuffers/flatbuffersConfigVersion.cmake || true
+          git clone --depth 1 -b v23.5.26 https://github.com/google/flatbuffers.git /tmp/flatbuffers
+          cd /tmp/flatbuffers
+          mkdir build && cd build
+          cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF
+          sudo cmake --install .
+          
+          git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
+          cd /tmp/vtzero
+          mkdir build && cd build
+          cmake .. -DVTZERO_BUILD_TESTS=OFF
+          sudo cmake --install .
           
       - name: Install Dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero
+          brew install cmake boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'

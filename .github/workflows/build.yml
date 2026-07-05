@@ -16,9 +16,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: ubuntu-24.04
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
+          - os: macos-15
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
           - os: macos-15
             arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
+          - os: windows-2022
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
 
     steps:
       - name: Checkout upstream OSRM

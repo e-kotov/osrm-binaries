@@ -338,24 +338,32 @@ jobs:
           if [ "$RUNNER_OS" == "macOS" ]; then
             if [ "${{ matrix.arch }}" == "x64" ]; then
               cp /usr/local/opt/tbb/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
-              cp /usr/local/opt/boost/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex}*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp /usr/local/opt/boost/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}*.dylib package/${{ matrix.artifact_name }}/ || true
             else
               cp $(brew --prefix tbb)/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
-              cp $(brew --prefix boost)/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex}*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp $(brew --prefix boost)/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}*.dylib package/${{ matrix.artifact_name }}/ || true
             fi
+            
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
               install_name_tool -add_rpath @loader_path package/${{ matrix.artifact_name }}/$exe || true
-              for lib in program_options filesystem iostreams system thread chrono date_time regex; do
+              for lib in program_options filesystem iostreams system thread chrono date_time regex random atomic container; do
                 install_name_tool -change "/opt/homebrew/opt/boost/lib/libboost_${lib}.dylib" "@rpath/libboost_${lib}.dylib" package/${{ matrix.artifact_name }}/$exe || true
                 install_name_tool -change "/usr/local/opt/boost/lib/libboost_${lib}.dylib" "@rpath/libboost_${lib}.dylib" package/${{ matrix.artifact_name }}/$exe || true
               done
             done
+            
             cd package/${{ matrix.artifact_name }}
-            for libfile in libboost_*.dylib; do
-              for dep in program_options filesystem iostreams system thread chrono date_time regex; do
-                install_name_tool -change "/opt/homebrew/opt/boost/lib/libboost_${dep}.dylib" "@loader_path/libboost_${dep}.dylib" $libfile || true
-                install_name_tool -change "/usr/local/opt/boost/lib/libboost_${dep}.dylib" "@loader_path/libboost_${dep}.dylib" $libfile || true
+            for libfile in *.dylib; do
+              # Ensure each library has the correct ID
+              install_name_tool -id "@loader_path/$libfile" "$libfile" || true
+              
+              # Fix internal boost and tbb dependencies within the dylibs themselves
+              for dep in program_options filesystem iostreams system thread chrono date_time regex random atomic container; do
+                install_name_tool -change "/opt/homebrew/opt/boost/lib/libboost_${dep}.dylib" "@loader_path/libboost_${dep}.dylib" "$libfile" || true
+                install_name_tool -change "/usr/local/opt/boost/lib/libboost_${dep}.dylib" "@loader_path/libboost_${dep}.dylib" "$libfile" || true
               done
+              install_name_tool -change "/opt/homebrew/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
+              install_name_tool -change "/usr/local/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
             done
             cd ../..
           fi
@@ -364,7 +372,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get install -y patchelf
             cp /usr/lib/*/libtbb.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
-            cp /usr/lib/*/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex}.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
+            cp /usr/lib/*/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
               patchelf --set-rpath '$ORIGIN' package/${{ matrix.artifact_name }}/$exe || true
             done
@@ -386,7 +394,7 @@ jobs:
           Copy-Item -Recurse "osrm-backend/profiles" -Destination "package/${{ matrix.artifact_name }}/"
           Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
           cd package
-          tar -czvf "${{ matrix.artifact_name }}.tar.gz" "${{ matrix.artifact_name }}"
+          tar -czf "${{ matrix.artifact_name }}.tar.gz" "${{ matrix.artifact_name }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

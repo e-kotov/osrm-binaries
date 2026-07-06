@@ -248,7 +248,15 @@ jobs:
             brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           fi
           
-          sudo rm -rf /usr/local/include/flatbuffers /usr/local/lib/libflatbuffers* /usr/local/lib/cmake/flatbuffers /opt/homebrew/include/flatbuffers /opt/homebrew/lib/libflatbuffers* /opt/homebrew/lib/cmake/flatbuffers
+          if [[ "${{ inputs.version_tag }}" == v5.* ]]; then
+            sudo rm -rf /usr/local/include/flatbuffers /usr/local/lib/libflatbuffers* /usr/local/lib/cmake/flatbuffers /opt/homebrew/include/flatbuffers /opt/homebrew/lib/libflatbuffers* /opt/homebrew/lib/cmake/flatbuffers
+          else
+            if [ "${{ matrix.arch }}" == "x64" ]; then
+              arch -x86_64 /usr/local/bin/brew install flatbuffers
+            else
+              brew install flatbuffers
+            fi
+          fi
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'

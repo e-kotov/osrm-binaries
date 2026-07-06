@@ -257,7 +257,7 @@ jobs:
           $lines = git log --oneline -- ports/lua
           $commit = ""
           foreach ($line in $lines) {
-              if ($line -notmatch "5.5" -and $line -match "[a-f0-9]{7,}") {
+              if ($line -match "5\.4") {
                   $commit = $line.split()[0]
                   break
               }

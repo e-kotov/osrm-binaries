@@ -138,6 +138,19 @@ jobs:
               c = c.replace('install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)', 'install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)\nendif()')
               with open('osrm-backend/CMakeLists.txt', 'w', encoding='utf-8') as f: f.write(c)
           except: pass
+          try:
+              with open('osrm-backend/include/server/connection.hpp', 'r', encoding='utf-8') as f: h = f.read()
+              h = '#include <chrono>\n#include <boost/asio/steady_timer.hpp>\n' + h
+              h = h.replace('boost::asio::deadline_timer', 'boost::asio::steady_timer')
+              with open('osrm-backend/include/server/connection.hpp', 'w', encoding='utf-8') as f: f.write(h)
+          except: pass
+          try:
+              with open('osrm-backend/src/server/connection.cpp', 'r', encoding='utf-8') as f: c2 = f.read()
+              c2 = '#include <chrono>\n' + c2
+              c2 = c2.replace('timer.expires_from_now(boost::posix_time::seconds(keepalive_timeout))', 'timer.expires_after(std::chrono::seconds(keepalive_timeout))')
+              c2 = c2.replace('timer.expires_from_now(boost::posix_time::seconds(0))', 'timer.expires_after(std::chrono::seconds(0))')
+              with open('osrm-backend/src/server/connection.cpp', 'w', encoding='utf-8') as f: f.write(c2)
+          except: pass
           "
           rm -f osrm-backend/cmake/FindLua.cmake
           find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\
@@ -148,6 +161,7 @@ jobs:
           #include <iostream>\
           #include <memory>\
           #include <utility>\
+          #include <chrono>\
           ' {}
           echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
           echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
@@ -184,8 +198,8 @@ jobs:
           cd /tmp/flatbuffers
           mkdir build && cd build
           if [ "${{ matrix.arch }}" == "x64" ]; then
-            arch -x86_64 cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64
-            arch -x86_64 cmake --build .
+            cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64
+            cmake --build .
             sudo cmake --install .
           else
             cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF -DCMAKE_OSX_ARCHITECTURES=arm64

@@ -243,8 +243,10 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" == "x64" ]; then
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            arch -x86_64 /usr/local/bin/brew untap aws/tap || true
             arch -x86_64 /usr/local/bin/brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           else
+            brew untap aws/tap || true
             brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           fi
           

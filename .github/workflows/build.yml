@@ -126,6 +126,9 @@ jobs:
               c = re.sub(r'find_package\(Boost 1\.\d+ REQUIRED', 'find_package(Boost 1.60 REQUIRED', c)
               c = re.sub(r'cmake_policy\(SET CMP0048 OLD\)', '', c)
               c = re.sub(r'find_package\(Lua 5\.2 REQUIRED\)', 'find_package(Lua 5.4 REQUIRED)', c)
+              c = c.replace('cmake_minimum_required(VERSION 3.2)', 'cmake_minimum_required(VERSION 3.2)\nif(APPLE)\ninclude_directories(/opt/homebrew/include /usr/local/include)\nendif()')
+              c = c.replace('foreach(engine_lib ${ENGINE_LIBRARIES})', 'if(NOT WIN32)\nforeach(engine_lib ${ENGINE_LIBRARIES})')
+              c = c.replace('install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)', 'install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)\nendif()')
               with open('osrm-backend/CMakeLists.txt', 'w', encoding='utf-8') as f: f.write(c)
           except: pass
           "

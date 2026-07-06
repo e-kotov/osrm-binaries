@@ -109,8 +109,14 @@ jobs:
           for file in glob.glob('osrm-backend/**/*.cpp', recursive=True) + glob.glob('osrm-backend/**/*.hpp', recursive=True):
               try:
                   with open(file, 'r', encoding='utf-8') as f: c = f.read()
+                  changed = False
                   if 'boost/filesystem/convenience.hpp' in c:
                       c = c.replace('boost/filesystem/convenience.hpp', 'boost/filesystem.hpp')
+                      changed = True
+                  if 'boost/geometry/multi/geometries/multi_linestring.hpp' in c:
+                      c = c.replace('boost/geometry/multi/geometries/multi_linestring.hpp', 'boost/geometry/geometries/multi_linestring.hpp')
+                      changed = True
+                  if changed:
                       with open(file, 'w', encoding='utf-8') as f: f.write(c)
               except: pass
           for file in glob.glob('osrm-backend/**/*.cmake', recursive=True) + glob.glob('osrm-backend/**/CMakeLists.txt', recursive=True):
@@ -179,6 +185,8 @@ jobs:
                   c = c.replace('option_variables.contains(', 'option_variables.count(')
               if 'boost/filesystem/convenience.hpp' in c:
                   c = c.replace('boost/filesystem/convenience.hpp', 'boost/filesystem.hpp')
+              if 'boost/geometry/multi/geometries/multi_linestring.hpp' in c:
+                  c = c.replace('boost/geometry/multi/geometries/multi_linestring.hpp', 'boost/geometry/geometries/multi_linestring.hpp')
               with open(file, 'w', encoding='utf-8') as f:
                   f.write(c)
           "

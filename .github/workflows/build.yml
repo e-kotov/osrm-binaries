@@ -303,7 +303,7 @@ jobs:
           fi
           cd osrm-backend
           mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off $CMAKE_ARGS
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off -DBoost_USE_STATIC_LIBS=ON $CMAKE_ARGS
           make -j$(nproc || sysctl -n hw.ncpu)
           
       - name: Build (Windows)

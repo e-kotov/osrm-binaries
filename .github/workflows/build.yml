@@ -139,7 +139,7 @@ jobs:
               c = re.sub(r'find_package\(Boost 1\.\d+ REQUIRED', 'find_package(Boost 1.60 REQUIRED', c)
               c = re.sub(r'cmake_policy\(SET CMP0048 OLD\)', '', c)
               c = re.sub(r'find_package\(Lua 5\.2 REQUIRED\)', 'find_package(Lua 5.4 REQUIRED)', c)
-              c = c.replace('cmake_minimum_required(VERSION 3.2)', 'cmake_minimum_required(VERSION 3.2)\nif(APPLE)\ninclude_directories(/opt/homebrew/include /usr/local/include)\nendif()')
+              c = c.replace('project(OSRM C CXX)', 'project(OSRM C CXX)\nif(APPLE)\ninclude_directories(/opt/homebrew/include /usr/local/include)\nendif()')
               c = c.replace('foreach(engine_lib ${ENGINE_LIBRARIES})', 'if(NOT WIN32)\nforeach(engine_lib ${ENGINE_LIBRARIES})')
               c = c.replace('install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)', 'install(FILES ${PROJECT_BINARY_DIR}/libosrm.pc DESTINATION ${PKGCONFIG_LIBRARY_DIR}/pkgconfig)\nendif()')
               with open('osrm-backend/CMakeLists.txt', 'w', encoding='utf-8') as f: f.write(c)
@@ -250,13 +250,13 @@ jobs:
               export PATH=$(echo $PATH | sed -e 's|/opt/homebrew/bin:||g' -e 's|/opt/homebrew/sbin:||g')
               export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
               export PKG_CONFIG_PATH="/usr/local/opt/lua@5.4/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig"
-              export CPATH="/usr/local/opt/libarchive/include"
-              export LIBRARY_PATH="/usr/local/opt/libarchive/lib"
+              export CPATH="/usr/local/opt/libarchive/include:/usr/local/include"
+              export LIBRARY_PATH="/usr/local/opt/libarchive/lib:/usr/local/lib"
               export MACOSX_DEPLOYMENT_TARGET="14.0"
               CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=/usr/local/opt/libarchive/include -DLibArchive_LIBRARY=/usr/local/opt/libarchive/lib/libarchive.dylib -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_IGNORE_PATH=/opt/homebrew -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DLUA_INCLUDE_DIR=/usr/local/opt/lua@5.4/include/lua -DLUA_LIBRARY=/usr/local/opt/lua@5.4/lib/liblua.dylib"
             else
-              export CPATH="/opt/homebrew/opt/libarchive/include:$CPATH"
-              export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:$LIBRARY_PATH"
+              export CPATH="/opt/homebrew/opt/libarchive/include:/opt/homebrew/include:$CPATH"
+              export LIBRARY_PATH="/opt/homebrew/opt/libarchive/lib:/opt/homebrew/lib:$LIBRARY_PATH"
               export MACOSX_DEPLOYMENT_TARGET="14.0"
               CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLibArchive_INCLUDE_DIR=$(brew --prefix libarchive)/include -DLibArchive_LIBRARY=$(brew --prefix libarchive)/lib/libarchive.dylib -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DLUA_INCLUDE_DIR=$(brew --prefix lua@5.4)/include/lua -DLUA_LIBRARY=$(brew --prefix lua@5.4)/lib/liblua.dylib"
             fi

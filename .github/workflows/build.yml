@@ -159,8 +159,13 @@ jobs:
           except: pass
           try:
               with open('osrm-backend/include/server/server.hpp', 'r', encoding='utf-8') as f: s = f.read()
-              s = s.replace('boost::asio::ip::tcp::resolver::query query(address, port_string);', '')
-              s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string);')
+              s = '#include <boost/version.hpp>\n' + s
+              old_resolve = 'boost::asio::ip::tcp::resolver::query query(address, port_string);\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);'
+              new_resolve = '#if BOOST_VERSION >= 106600\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string).begin();\n#else\n        boost::asio::ip::tcp::resolver::query query(address, port_string);\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif'
+              s = s.replace(old_resolve, new_resolve)
+              # In case the newlines or formatting was slightly different:
+              s = s.replace('boost::asio::ip::tcp::resolver::query query(address, port_string);', '#if BOOST_VERSION >= 106600\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string).begin();\n#else\n        boost::asio::ip::tcp::resolver::query query(address, port_string);')
+              s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif')
               with open('osrm-backend/include/server/server.hpp', 'w', encoding='utf-8') as f: f.write(s)
           except: pass
           "

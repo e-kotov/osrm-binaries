@@ -175,9 +175,22 @@ jobs:
         run: |
           if [ "${{ matrix.arch }}" == "x64" ]; then
             arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            arch -x86_64 /usr/local/bin/brew install cmake pkg-config boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+            arch -x86_64 /usr/local/bin/brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           else
-            brew install cmake pkg-config boost libzip libstxxl lua tbb libarchive fmt rapidjson sol2 flatbuffers protozero vtzero libosmium
+            brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
+          fi
+          
+          git clone --depth 1 -b v23.5.26 https://github.com/google/flatbuffers.git /tmp/flatbuffers
+          cd /tmp/flatbuffers
+          mkdir build && cd build
+          if [ "${{ matrix.arch }}" == "x64" ]; then
+            arch -x86_64 cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64
+            arch -x86_64 cmake --build .
+            sudo cmake --install .
+          else
+            cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF -DCMAKE_OSX_ARCHITECTURES=arm64
+            cmake --build .
+            sudo cmake --install .
           fi
 
       - name: Install Dependencies (Windows)

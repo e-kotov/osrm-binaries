@@ -106,6 +106,13 @@ jobs:
               c = c.replace('option_variables.contains(', 'option_variables.count(')
               with open(file, 'w') as f:
                   f.write(c)
+          for file in glob.glob('osrm-backend/**/*.cpp', recursive=True) + glob.glob('osrm-backend/**/*.hpp', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: c = f.read()
+                  if 'boost/filesystem/convenience.hpp' in c:
+                      c = c.replace('boost/filesystem/convenience.hpp', 'boost/filesystem.hpp')
+                      with open(file, 'w', encoding='utf-8') as f: f.write(c)
+              except: pass
           for file in glob.glob('osrm-backend/**/*.cmake', recursive=True) + glob.glob('osrm-backend/**/CMakeLists.txt', recursive=True):
               try:
                   with open(file, 'r', encoding='utf-8') as f: c = f.read()
@@ -156,6 +163,8 @@ jobs:
               c = '#include <cstdint>\n' + c
               if 'option_variables.contains(' in c:
                   c = c.replace('option_variables.contains(', 'option_variables.count(')
+              if 'boost/filesystem/convenience.hpp' in c:
+                  c = c.replace('boost/filesystem/convenience.hpp', 'boost/filesystem.hpp')
               with open(file, 'w', encoding='utf-8') as f:
                   f.write(c)
           "

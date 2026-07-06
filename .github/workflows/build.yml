@@ -168,6 +168,12 @@ jobs:
               s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif')
               with open('osrm-backend/include/server/server.hpp', 'w', encoding='utf-8') as f: f.write(s)
           except: pass
+          for file in glob.glob('osrm-backend/**/sol.hpp', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: s2 = f.read()
+                  s2 = s2.replace('LUA_VERSION_NUM > 504', 'LUA_VERSION_NUM > 505')
+                  with open(file, 'w', encoding='utf-8') as f: f.write(s2)
+              except: pass
           "
           rm -f osrm-backend/cmake/FindLua.cmake
           find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\
@@ -223,6 +229,12 @@ jobs:
               s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif')
               with open('osrm-backend/include/server/server.hpp', 'w', encoding='utf-8') as f: f.write(s)
           except: pass
+          for file in glob.glob('osrm-backend/**/sol.hpp', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: s2 = f.read()
+                  s2 = s2.replace('LUA_VERSION_NUM > 504', 'LUA_VERSION_NUM > 505')
+                  with open(file, 'w', encoding='utf-8') as f: f.write(s2)
+              except: pass
           "
 
 

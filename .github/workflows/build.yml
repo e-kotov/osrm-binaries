@@ -157,6 +157,12 @@ jobs:
               c2 = c2.replace('timer.expires_from_now(boost::posix_time::seconds(0))', 'timer.expires_after(std::chrono::seconds(0))')
               with open('osrm-backend/src/server/connection.cpp', 'w', encoding='utf-8') as f: f.write(c2)
           except: pass
+          try:
+              with open('osrm-backend/include/server/server.hpp', 'r', encoding='utf-8') as f: s = f.read()
+              s = s.replace('boost::asio::ip::tcp::resolver::query query(address, port_string);', '')
+              s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string);')
+              with open('osrm-backend/include/server/server.hpp', 'w', encoding='utf-8') as f: f.write(s)
+          except: pass
           "
           rm -f osrm-backend/cmake/FindLua.cmake
           find osrm-backend -type f -name '*.hpp' -o -name '*.cpp' | xargs -I {} sed -i.bak '1i\

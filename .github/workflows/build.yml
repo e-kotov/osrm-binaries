@@ -356,6 +356,8 @@ jobs:
                 install_name_tool -change "/opt/homebrew/opt/boost/lib/libboost_${lib}.dylib" "@rpath/libboost_${lib}.dylib" package/${{ matrix.artifact_name }}/$exe || true
                 install_name_tool -change "/usr/local/opt/boost/lib/libboost_${lib}.dylib" "@rpath/libboost_${lib}.dylib" package/${{ matrix.artifact_name }}/$exe || true
               done
+              install_name_tool -change "/opt/homebrew/opt/tbb/lib/libtbb.12.dylib" "@rpath/libtbb.12.dylib" package/${{ matrix.artifact_name }}/$exe || true
+              install_name_tool -change "/usr/local/opt/tbb/lib/libtbb.12.dylib" "@rpath/libtbb.12.dylib" package/${{ matrix.artifact_name }}/$exe || true
             done
             
             cd package/${{ matrix.artifact_name }}
@@ -392,11 +394,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "package/${{ matrix.artifact_name }}"
-          Copy-Item "osrm-backend/build/Release/osrm-extract.exe" -Destination "package/${{ matrix.artifact_name }}/"
-          Copy-Item "osrm-backend/build/Release/osrm-routed.exe" -Destination "package/${{ matrix.artifact_name }}/"
-          Copy-Item "osrm-backend/build/Release/osrm-contract.exe" -Destination "package/${{ matrix.artifact_name }}/"
-          Copy-Item "osrm-backend/build/Release/osrm-customize.exe" -Destination "package/${{ matrix.artifact_name }}/"
-          Copy-Item "osrm-backend/build/Release/osrm-partition.exe" -Destination "package/${{ matrix.artifact_name }}/"
+          Copy-Item "osrm-backend/build/Release/*.exe" -Destination "package/${{ matrix.artifact_name }}/"
+          if (Test-Path "osrm-backend/build/Release/*.dll") { Copy-Item "osrm-backend/build/Release/*.dll" -Destination "package/${{ matrix.artifact_name }}/" }
           Copy-Item -Recurse "osrm-backend/profiles" -Destination "package/${{ matrix.artifact_name }}/"
           Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
           cd package

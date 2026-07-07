@@ -267,22 +267,6 @@ jobs:
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          cd C:\vcpkg
-          $lines = git log --oneline -- ports/lua
-          $commit = ""
-          foreach ($line in $lines) {
-              if ($line -match "5\.4") {
-                  $commit = $line.split()[0]
-                  break
-              }
-          }
-          if ($commit) {
-              Write-Host "Reverting lua port to commit $commit"
-              git checkout $commit -- ports/lua
-              if (Test-Path "versions/l/lua.json") {
-                  git checkout $commit -- versions/l/lua.json
-              }
-          }
           vcpkg install bzip2 boost expat stxxl lua tbb --triplet x64-windows
 
       - name: Build (Linux / macOS)
@@ -417,7 +401,11 @@ jobs:
           Copy-Item "osrm-backend/build/Release/*.exe" -Destination "package/${{ matrix.artifact_name }}/"
           if (Test-Path "osrm-backend/build/Release/*.dll") { Copy-Item "osrm-backend/build/Release/*.dll" -Destination "package/${{ matrix.artifact_name }}/" }
           Copy-Item -Recurse "osrm-backend/profiles" -Destination "package/${{ matrix.artifact_name }}/"
-          Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
+          if (Test-Path "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll") {
+              Copy-Item "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
+          } else {
+              Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
+          }
           cd package
           tar -czf "${{ matrix.artifact_name }}.tar.gz" "${{ matrix.artifact_name }}"
 

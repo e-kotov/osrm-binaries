@@ -345,9 +345,13 @@ jobs:
             if [ "${{ matrix.arch }}" == "x64" ]; then
               cp /usr/local/opt/tbb/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
               cp /usr/local/opt/boost/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp /usr/local/opt/libarchive/lib/libarchive*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp /usr/local/opt/lua@5.4/lib/liblua*.dylib package/${{ matrix.artifact_name }}/ || true
             else
               cp $(brew --prefix tbb)/lib/libtbb*.dylib package/${{ matrix.artifact_name }}/ || true
               cp $(brew --prefix boost)/lib/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp $(brew --prefix libarchive)/lib/libarchive*.dylib package/${{ matrix.artifact_name }}/ || true
+              cp $(brew --prefix lua@5.4)/lib/liblua*.dylib package/${{ matrix.artifact_name }}/ || true
             fi
             
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
@@ -358,6 +362,10 @@ jobs:
               done
               install_name_tool -change "/opt/homebrew/opt/tbb/lib/libtbb.12.dylib" "@rpath/libtbb.12.dylib" package/${{ matrix.artifact_name }}/$exe || true
               install_name_tool -change "/usr/local/opt/tbb/lib/libtbb.12.dylib" "@rpath/libtbb.12.dylib" package/${{ matrix.artifact_name }}/$exe || true
+              install_name_tool -change "/opt/homebrew/opt/libarchive/lib/libarchive.13.dylib" "@rpath/libarchive.13.dylib" package/${{ matrix.artifact_name }}/$exe || true
+              install_name_tool -change "/usr/local/opt/libarchive/lib/libarchive.13.dylib" "@rpath/libarchive.13.dylib" package/${{ matrix.artifact_name }}/$exe || true
+              install_name_tool -change "/opt/homebrew/opt/lua@5.4/lib/liblua.dylib" "@rpath/liblua.dylib" package/${{ matrix.artifact_name }}/$exe || true
+              install_name_tool -change "/usr/local/opt/lua@5.4/lib/liblua.dylib" "@rpath/liblua.dylib" package/${{ matrix.artifact_name }}/$exe || true
             done
             
             cd package/${{ matrix.artifact_name }}
@@ -372,6 +380,10 @@ jobs:
               done
               install_name_tool -change "/opt/homebrew/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
               install_name_tool -change "/usr/local/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
+              install_name_tool -change "/opt/homebrew/opt/libarchive/lib/libarchive.13.dylib" "@loader_path/libarchive.13.dylib" "$libfile" || true
+              install_name_tool -change "/usr/local/opt/libarchive/lib/libarchive.13.dylib" "@loader_path/libarchive.13.dylib" "$libfile" || true
+              install_name_tool -change "/opt/homebrew/opt/lua@5.4/lib/liblua.dylib" "@loader_path/liblua.dylib" "$libfile" || true
+              install_name_tool -change "/usr/local/opt/lua@5.4/lib/liblua.dylib" "@loader_path/liblua.dylib" "$libfile" || true
             done
             for libfile in *.dylib; do
               codesign --force --sign - "$libfile" || true

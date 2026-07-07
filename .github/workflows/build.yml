@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ inputs.version_tag }} on ${{ matrix.os }}
+    name: Build ${{ github.event.inputs.version_tag || github.ref_name }} on ${{ matrix.os }} (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

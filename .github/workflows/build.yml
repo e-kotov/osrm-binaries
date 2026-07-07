@@ -186,7 +186,7 @@ jobs:
           #include <utility>\
           #include <chrono>\
           ' {}
-          echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
+          find osrm-backend -type f -name 'CMakeLists.txt' | xargs -I {} sed -i.bak 's/Boost::regex//g' {}
           echo 'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-deprecated-copy")' >> osrm-backend/CMakeLists.txt
 
       - name: Patch OSRM Source (Windows)
@@ -206,6 +206,12 @@ jobs:
                   c = c.replace('boost/geometry/multi/geometries/multi_linestring.hpp', 'boost/geometry/geometries/multi_linestring.hpp')
               with open(file, 'w', encoding='utf-8') as f:
                   f.write(c)
+          for file in glob.glob('osrm-backend/**/CMakeLists.txt', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: c = f.read()
+                  c = c.replace('Boost::regex', '')
+                  with open(file, 'w', encoding='utf-8') as f: f.write(c)
+              except: pass
           try:
               with open('osrm-backend/include/server/connection.hpp', 'r', encoding='utf-8') as f: h = f.read()
               h = '#include <chrono>\n#include <boost/asio/steady_timer.hpp>\n' + h

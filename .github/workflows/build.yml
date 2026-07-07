@@ -423,13 +423,22 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          
-      - name: Publish Release
+
+      - name: Generate Checksums
+        run: |
+          cd artifacts
+          find . -name "*.tar.gz" -exec shasum -a 256 {} + | sed 's|^\([a-f0-9]*\)  .*/\([^/]*\)$|\1  \2|' > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.version_tag != ''
         with:
-          tag_name: ${{ inputs.version_tag }}
-          files: artifacts/*/*.tar.gz
+          tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/checksums.txt

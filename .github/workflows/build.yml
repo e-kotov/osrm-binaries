@@ -373,6 +373,14 @@ jobs:
               install_name_tool -change "/opt/homebrew/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
               install_name_tool -change "/usr/local/opt/tbb/lib/libtbb.12.dylib" "@loader_path/libtbb.12.dylib" "$libfile" || true
             done
+            for libfile in *.dylib; do
+              codesign --force --sign - "$libfile" || true
+            done
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              if [ -f "$exe" ]; then
+                codesign --force --sign - "$exe" || true
+              fi
+            done
             cd ../..
           fi
           

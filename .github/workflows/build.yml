@@ -1,5 +1,11 @@
 name: Build and Release OSRM Binaries
 
+run-name: Build ${{ inputs.version_tag }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.version_tag }}
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,6 +13,9 @@ on:
         description: 'Upstream OSRM tag to build (e.g., v26.7.1)'
         required: true
         type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -25,7 +34,7 @@ jobs:
           - os: macos-15
             arch: arm64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
-          - os: macos-15
+          - os: macos-15-intel
             arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: windows-2022
@@ -33,6 +42,14 @@ jobs:
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
 
     steps:
+      - name: Validate version_tag
+        run: |
+          if [[ ! "${{ inputs.version_tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version_tag format: ${{ inputs.version_tag }}"
+            exit 1
+          fi
+        shell: bash
+
       - name: Checkout upstream OSRM
         uses: actions/checkout@v4
         with:
@@ -47,7 +64,7 @@ jobs:
           sudo apt-get install -y build-essential git cmake pkg-config \
             libbz2-dev libstxxl-dev libstxxl1v5 libxml2-dev \
             libzip-dev libboost-all-dev libtbb-dev libarchive-dev libfmt-dev rapidjson-dev libprotozero-dev libosmium2-dev
-            
+
       - name: Install sol2, flatbuffers, vtzero, lua5.4 (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -63,17 +80,17 @@ jobs:
           mkdir build && cd build
           cmake ..
           sudo cmake --install .
-          
+
           git clone --depth 1 -b v23.5.26 https://github.com/google/flatbuffers.git /tmp/flatbuffers
           cd /tmp/flatbuffers
           mkdir build && cd build
           cmake .. -DFLATBUFFERS_BUILD_TESTS=OFF -DFLATBUFFERS_BUILD_SHAREDLIB=OFF
           cmake --build .
           sudo cmake --install .
-          
+
           git clone --depth 1 -b v1.1.0 https://github.com/mapbox/vtzero.git /tmp/vtzero
           sudo cp -r /tmp/vtzero/include/vtzero /usr/local/include/
-          
+
       - name: Patch OSRM Source (Fix std::atomic_ref, GCC 11 visit, MSVC count)
         if: runner.os != 'Windows'
         run: |
@@ -248,12 +265,14 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           if [ "${{ matrix.arch }}" == "x64" ]; then
-            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            if [ ! -x /usr/local/bin/brew ]; then
+              arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
             arch -x86_64 /usr/local/bin/brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           else
             brew install cmake pkg-config boost libzip libstxxl lua@5.4 tbb libarchive fmt rapidjson sol2 protozero vtzero libosmium
           fi
-          
+
           if [[ "${{ inputs.version_tag }}" == v5.* ]]; then
             sudo rm -rf /usr/local/include/flatbuffers /usr/local/lib/libflatbuffers* /usr/local/lib/cmake/flatbuffers /opt/homebrew/include/flatbuffers /opt/homebrew/lib/libflatbuffers* /opt/homebrew/lib/cmake/flatbuffers
           else
@@ -267,7 +286,23 @@ jobs:
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          vcpkg install bzip2 boost expat stxxl lua tbb --triplet x64-windows
+          cd C:\vcpkg
+          $lines = git log --oneline -- ports/lua
+          $commit = ""
+          foreach ($line in $lines) {
+              if ($line -match "5\.4") {
+                  $commit = $line.split()[0]
+                  break
+              }
+          }
+          if ($commit) {
+              Write-Host "Reverting lua port to commit $commit"
+              git checkout $commit -- ports/lua
+              if (Test-Path "versions/l/lua.json") {
+                  git checkout $commit -- versions/l/lua.json
+              }
+          }
+          vcpkg install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
 
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
@@ -303,7 +338,7 @@ jobs:
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off $CMAKE_ARGS
           make -j$(nproc || sysctl -n hw.ncpu)
-          
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -316,6 +351,7 @@ jobs:
       - name: Package Artifacts (Unix)
         if: runner.os != 'Windows'
         run: |
+          set -euo pipefail
           mkdir -p package/${{ matrix.artifact_name }}
           cp osrm-backend/build/osrm-extract package/${{ matrix.artifact_name }}/
           cp osrm-backend/build/osrm-routed package/${{ matrix.artifact_name }}/
@@ -323,7 +359,7 @@ jobs:
           cp osrm-backend/build/osrm-customize package/${{ matrix.artifact_name }}/
           cp osrm-backend/build/osrm-partition package/${{ matrix.artifact_name }}/
           cp -r osrm-backend/profiles package/${{ matrix.artifact_name }}/
-          
+
           # Bundle TBB, Boost and patch RPATH for macOS
           if [ "$RUNNER_OS" == "macOS" ]; then
             if [ "${{ matrix.arch }}" == "x64" ]; then
@@ -337,7 +373,7 @@ jobs:
               cp $(brew --prefix libarchive)/lib/libarchive*.dylib package/${{ matrix.artifact_name }}/ || true
               cp $(brew --prefix lua@5.4)/lib/liblua*.dylib package/${{ matrix.artifact_name }}/ || true
             fi
-            
+
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
               install_name_tool -add_rpath @loader_path package/${{ matrix.artifact_name }}/$exe || true
               for lib in program_options filesystem iostreams system thread chrono date_time regex random atomic container; do
@@ -351,12 +387,13 @@ jobs:
               install_name_tool -change "/opt/homebrew/opt/lua@5.4/lib/liblua.dylib" "@rpath/liblua.dylib" package/${{ matrix.artifact_name }}/$exe || true
               install_name_tool -change "/usr/local/opt/lua@5.4/lib/liblua.dylib" "@rpath/liblua.dylib" package/${{ matrix.artifact_name }}/$exe || true
             done
-            
+
             cd package/${{ matrix.artifact_name }}
+            shopt -s nullglob
             for libfile in *.dylib; do
               # Ensure each library has the correct ID
               install_name_tool -id "@loader_path/$libfile" "$libfile" || true
-              
+
               # Fix internal boost and tbb dependencies within the dylibs themselves
               for dep in program_options filesystem iostreams system thread chrono date_time regex random atomic container; do
                 install_name_tool -change "/opt/homebrew/opt/boost/lib/libboost_${dep}.dylib" "@loader_path/libboost_${dep}.dylib" "$libfile" || true
@@ -377,18 +414,48 @@ jobs:
                 codesign --force --sign - "$exe" || true
               fi
             done
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              if otool -L "$exe" | grep -E "/opt/homebrew|/usr/local/opt"; then
+                echo "Unpackaged Homebrew dependency found in $exe"
+                exit 1
+              fi
+            done
+            for libfile in *.dylib; do
+              if otool -L "$libfile" | grep -E "/opt/homebrew|/usr/local/opt"; then
+                echo "Unpackaged Homebrew dependency found in $libfile"
+                exit 1
+              fi
+            done
+            shopt -u nullglob
             cd ../..
           fi
-          
+
           # Bundle TBB, Boost and patch RPATH for Linux
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get install -y patchelf
             cp /usr/lib/*/libtbb.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
             cp /usr/lib/*/libboost_{program_options,filesystem,iostreams,system,thread,chrono,date_time,regex,random,atomic,container}.so* package/${{ matrix.artifact_name }}/ 2>/dev/null || true
             for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
-              patchelf --set-rpath '$ORIGIN' package/${{ matrix.artifact_name }}/$exe || true
+              patchelf --set-rpath '$ORIGIN' package/${{ matrix.artifact_name }}/$exe
+              deps="$(ldd "package/${{ matrix.artifact_name }}/$exe")"
+              echo "$deps"
+              if echo "$deps" | grep "not found"; then
+                echo "Missing dynamic library in $exe"
+                exit 1
+              fi
+              unpackaged_deps="$(echo "$deps" | grep -E "lib(boost_|tbb)" | grep -F -v "$(pwd)/package/${{ matrix.artifact_name }}/" || true)"
+              if [ -n "$unpackaged_deps" ]; then
+                echo "Unpackaged Boost/TBB dependency found in $exe"
+                echo "$unpackaged_deps"
+                exit 1
+              fi
             done
           fi
+
+          for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+            test -x "package/${{ matrix.artifact_name }}/$exe"
+          done
+          test -d "package/${{ matrix.artifact_name }}/profiles"
 
           cd package
           tar -czvf ${{ matrix.artifact_name }}.tar.gz ${{ matrix.artifact_name }}
@@ -406,6 +473,16 @@ jobs:
           } else {
               Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"
           }
+          $expected = @("osrm-extract.exe", "osrm-routed.exe", "osrm-contract.exe", "osrm-customize.exe", "osrm-partition.exe")
+          foreach ($exe in $expected) {
+            if (!(Test-Path "package/${{ matrix.artifact_name }}/$exe")) {
+              throw "Missing expected executable: $exe"
+            }
+          }
+          $dllCount = @(Get-ChildItem "package/${{ matrix.artifact_name }}" -Filter "*.dll").Count
+          if ($dllCount -eq 0) {
+            throw "No DLLs were bundled into the Windows package"
+          }
           cd package
           tar -czf "${{ matrix.artifact_name }}.tar.gz" "${{ matrix.artifact_name }}"
 
@@ -414,11 +491,104 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: package/${{ matrix.artifact_name }}.tar.gz
-          retention-days: 1
+          retention-days: 7
+
+
+  test:
+    name: Test ${{ matrix.arch }} on ${{ matrix.os }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
+          - os: macos-15
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
+          - os: macos-15-intel
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
+          - os: windows-2022
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
+
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: download-dir
+
+      - name: Extract Artifact
+        run: |
+          cd download-dir
+          tar -xzf ${{ matrix.artifact_name }}.tar.gz
+
+      - name: Dependency Audit & Run Sanity Checks (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd download-dir/${{ matrix.artifact_name }}
+          echo "Running dependency audits..."
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              deps="$(ldd "./$exe")"
+              echo "$deps"
+              if echo "$deps" | grep "not found"; then
+                echo "Missing dynamic library in $exe"
+                exit 1
+              fi
+              unpackaged_deps="$(echo "$deps" | grep -E "lib(boost_|tbb)" | grep -F -v "$PWD/" || true)"
+              if [ -n "$unpackaged_deps" ]; then
+                echo "Unpackaged Boost/TBB dependency found in $exe"
+                echo "$unpackaged_deps"
+                exit 1
+              fi
+            done
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              if otool -L $exe | grep -E "/opt/homebrew|/usr/local/opt"; then
+                echo "Unpackaged Homebrew dependency found in $exe"
+                exit 1
+              fi
+            done
+            for lib in *.dylib; do
+              if otool -L $lib | grep -E "/opt/homebrew|/usr/local/opt"; then
+                echo "Unpackaged Homebrew dependency found in $lib"
+                exit 1
+              fi
+            done
+          fi
+          echo "Audits passed."
+
+          echo "Testing all shipped executables..."
+          for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+             ./$exe --version
+          done
+
+      - name: Run Sanity Checks (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd download-dir\${{ matrix.artifact_name }}
+          $packageDir = (Get-Location).Path
+          $env:PATH = "$packageDir;$env:SystemRoot\System32;$env:SystemRoot"
+          Write-Host "Testing all shipped executables..."
+          .\osrm-extract.exe --version
+          .\osrm-routed.exe --version
+          .\osrm-contract.exe --version
+          .\osrm-customize.exe --version
+          .\osrm-partition.exe --version
+
 
   release:
     name: Publish Release
-    needs: build
+    needs: [build, test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -427,6 +597,38 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Validate release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            "osrm-${{ inputs.version_tag }}-linux-x64-Release"
+            "osrm-${{ inputs.version_tag }}-linux-arm64-Release"
+            "osrm-${{ inputs.version_tag }}-darwin-arm64-Release"
+            "osrm-${{ inputs.version_tag }}-darwin-x64-Release"
+            "osrm-${{ inputs.version_tag }}-win32-x64-Release"
+          )
+          artifact_count="$(find artifacts -mindepth 2 -maxdepth 2 -name '*.tar.gz' | wc -l | tr -d ' ')"
+          if [ "$artifact_count" -ne "${#expected[@]}" ]; then
+            echo "Expected ${#expected[@]} release archives, found $artifact_count"
+            find artifacts -mindepth 1 -maxdepth 3 -type f -print
+            exit 1
+          fi
+          for artifact in "${expected[@]}"; do
+            archive="artifacts/$artifact/$artifact.tar.gz"
+            if [ ! -f "$archive" ]; then
+              echo "Missing expected release archive: $archive"
+              exit 1
+            fi
+            tar -tzf "$archive" > /tmp/archive-list.txt
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              if ! grep -Fxq "$artifact/$exe" /tmp/archive-list.txt && ! grep -Fxq "$artifact/$exe.exe" /tmp/archive-list.txt; then
+                echo "Archive $archive is missing $exe"
+                exit 1
+              fi
+            done
+          done
 
       - name: Generate Checksums
         run: |
@@ -442,3 +644,4 @@ jobs:
           files: |
             artifacts/**/*.tar.gz
             artifacts/checksums.txt
+          fail_on_unmatched_files: true

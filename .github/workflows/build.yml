@@ -390,6 +390,28 @@ jobs:
 
             cd package/${{ matrix.artifact_name }}
             shopt -s nullglob
+
+            # Recursively bundle Homebrew dylib dependencies and rewrite them to
+            # load from the package directory. This catches transitive deps such
+            # as libarchive -> xz/zstd/lz4/libb2.
+            while true; do
+              added=0
+              for target in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition *.dylib; do
+                [ -f "$target" ] || continue
+                while IFS= read -r dep; do
+                  dep_name="$(basename "$dep")"
+                  if [ ! -f "$dep_name" ]; then
+                    cp "$dep" "$dep_name"
+                    added=1
+                  fi
+                  install_name_tool -change "$dep" "@loader_path/$dep_name" "$target" || true
+                done < <(otool -L "$target" | awk '/\/opt\/homebrew\/|\/usr\/local\/opt\// {print $1}')
+              done
+              if [ "$added" -eq 0 ]; then
+                break
+              fi
+            done
+
             for libfile in *.dylib; do
               # Ensure each library has the correct ID
               install_name_tool -id "@loader_path/$libfile" "$libfile" || true

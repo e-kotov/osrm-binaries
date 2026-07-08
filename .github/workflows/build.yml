@@ -314,6 +314,7 @@ jobs:
             "boost-random",
             "boost-regex",
             "boost-system",
+            "boost-test",
             "boost-thread",
             "expat",
             "stxxl",

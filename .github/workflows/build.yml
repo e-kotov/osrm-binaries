@@ -302,62 +302,7 @@ jobs:
                   git checkout $commit -- versions/l/lua.json
               }
           }
-          $packages = @(
-            "bzip2",
-            "boost-algorithm",
-            "boost-any",
-            "boost-array",
-            "boost-asio",
-            "boost-assert",
-            "boost-atomic",
-            "boost-bind",
-            "boost-chrono",
-            "boost-config",
-            "boost-container",
-            "boost-container-hash",
-            "boost-core",
-            "boost-crc",
-            "boost-date-time",
-            "boost-dynamic-bitset",
-            "boost-exception",
-            "boost-filesystem",
-            "boost-foreach",
-            "boost-format",
-            "boost-function",
-            "boost-fusion",
-            "boost-geometry",
-            "boost-heap",
-            "boost-interprocess",
-            "boost-io",
-            "boost-iostreams",
-            "boost-iterator",
-            "boost-math",
-            "boost-mpl",
-            "boost-numeric-conversion",
-            "boost-optional",
-            "boost-phoenix",
-            "boost-program-options",
-            "boost-random",
-            "boost-range",
-            "boost-regex",
-            "boost-serialization",
-            "boost-spirit",
-            "boost-system",
-            "boost-test",
-            "boost-thread",
-            "boost-tokenizer",
-            "boost-unordered",
-            "boost-utility",
-            "boost-uuid",
-            "boost-variant",
-            "expat",
-            "stxxl",
-            "lua",
-            "tbb",
-            "libarchive",
-            "libzip"
-          )
-          vcpkg install @packages --triplet x64-windows
+          vcpkg install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
 
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'

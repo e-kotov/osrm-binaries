@@ -97,8 +97,10 @@ jobs:
         shell: pwsh
         run: |
           $start = Get-Date
-          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:VCPKG_ROOT"
+          # Clone full vcpkg to ensure port files/blobs are present for pinned checkout
+          git clone https://github.com/microsoft/vcpkg.git "$env:VCPKG_ROOT"
           cd "$env:VCPKG_ROOT"
+          git fetch --all --tags
           git checkout "$env:VCPKG_COMMIT"
           .\bootstrap-vcpkg.bat -disableMetrics
           if ($LASTEXITCODE -ne 0) {

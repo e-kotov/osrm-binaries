@@ -1,9 +1,9 @@
-name: Test Windows vcpkg Cache
+name: Build and Release OSRM Binaries
 
-run-name: Test Windows vcpkg cache ${{ inputs.version_tag }}
+run-name: Build ${{ inputs.version_tag }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.version_tag }}
+  group: ${{ github.workflow }}-${{ inputs.version_tag }}
   cancel-in-progress: false
 
 on:
@@ -31,6 +31,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: ubuntu-24.04
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
+          - os: macos-15
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
+          - os: macos-15-intel
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: windows-2022
             arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
@@ -593,6 +605,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: ubuntu-24.04
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-x64-Release
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-linux-arm64-Release
+          - os: macos-15
+            arch: arm64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-arm64-Release
+          - os: macos-15-intel
+            arch: x64
+            artifact_name: osrm-${{ inputs.version_tag }}-darwin-x64-Release
           - os: windows-2022
             arch: x64
             artifact_name: osrm-${{ inputs.version_tag }}-win32-x64-Release
@@ -663,3 +687,64 @@ jobs:
           .\osrm-contract.exe --version
           .\osrm-customize.exe --version
           .\osrm-partition.exe --version
+
+
+  release:
+    name: Publish Release
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Validate release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            "osrm-${{ inputs.version_tag }}-linux-x64-Release"
+            "osrm-${{ inputs.version_tag }}-linux-arm64-Release"
+            "osrm-${{ inputs.version_tag }}-darwin-arm64-Release"
+            "osrm-${{ inputs.version_tag }}-darwin-x64-Release"
+            "osrm-${{ inputs.version_tag }}-win32-x64-Release"
+          )
+          artifact_count="$(find artifacts -mindepth 2 -maxdepth 2 -name '*.tar.gz' | wc -l | tr -d ' ')"
+          if [ "$artifact_count" -ne "${#expected[@]}" ]; then
+            echo "Expected ${#expected[@]} release archives, found $artifact_count"
+            find artifacts -mindepth 1 -maxdepth 3 -type f -print
+            exit 1
+          fi
+          for artifact in "${expected[@]}"; do
+            archive="artifacts/$artifact/$artifact.tar.gz"
+            if [ ! -f "$archive" ]; then
+              echo "Missing expected release archive: $archive"
+              exit 1
+            fi
+            tar -tzf "$archive" > /tmp/archive-list.txt
+            for exe in osrm-extract osrm-routed osrm-contract osrm-customize osrm-partition; do
+              if ! grep -Fxq "$artifact/$exe" /tmp/archive-list.txt && ! grep -Fxq "$artifact/$exe.exe" /tmp/archive-list.txt; then
+                echo "Archive $archive is missing $exe"
+                exit 1
+              fi
+            done
+          done
+
+      - name: Generate Checksums
+        run: |
+          cd artifacts
+          find . -name "*.tar.gz" -exec shasum -a 256 {} + | sed 's|^\([a-f0-9]*\)  .*/\([^/]*\)$|\1  \2|' > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.version_tag != ''
+        with:
+          tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/checksums.txt
+          fail_on_unmatched_files: true

@@ -1,0 +1,341 @@
+name: Windows Build Speed Test
+
+run-name: Windows speed test ${{ inputs.version_tag }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.version_tag }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: "Upstream OSRM tag to build (e.g., v26.4.1)"
+        required: true
+        type: string
+        default: "v26.4.1"
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  VCPKG_BINARY_CACHE_DIR: ${{ github.workspace }}\vcpkg-binary-cache
+
+jobs:
+  windows-build:
+    name: ${{ matrix.variant }} (${{ inputs.version_tag }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: current-msbuild-p4
+            use_ninja: "false"
+            parallelism: "4"
+            use_vcpkg_binary_cache: "false"
+          - variant: ninja-p4
+            use_ninja: "true"
+            parallelism: "4"
+            use_vcpkg_binary_cache: "false"
+          - variant: ninja-p8-vcpkg-cache
+            use_ninja: "true"
+            parallelism: "8"
+            use_vcpkg_binary_cache: "true"
+
+    steps:
+      - name: Validate version_tag
+        shell: bash
+        run: |
+          if [[ ! "${{ inputs.version_tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version_tag format: ${{ inputs.version_tag }}"
+            exit 1
+          fi
+
+      - name: Initialize timing summary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "timings" | Out-Null
+          $timingFile = "timings/${{ matrix.variant }}.md"
+          @(
+            "# Windows build speed test"
+            ""
+            "- Variant: `${{ matrix.variant }}`"
+            "- Version tag: `${{ inputs.version_tag }}`"
+            "- Ninja: `${{ matrix.use_ninja }}`"
+            "- Parallelism: `${{ matrix.parallelism }}`"
+            "- vcpkg binary cache: `${{ matrix.use_vcpkg_binary_cache }}`"
+            ""
+            "| Phase | Seconds |"
+            "| --- | ---: |"
+          ) | Set-Content -Path $timingFile
+
+      - name: Runner info
+        shell: pwsh
+        run: |
+          systeminfo | Select-String -Pattern "OS Name", "OS Version", "System Type", "Processor"
+          cmake --version
+          git --version
+          if (Get-Command ninja -ErrorAction SilentlyContinue) {
+            ninja --version
+          } else {
+            Write-Host "Ninja is not currently on PATH"
+          }
+
+      - name: Checkout upstream OSRM
+        uses: actions/checkout@v4
+        with:
+          repository: "Project-OSRM/osrm-backend"
+          ref: ${{ inputs.version_tag }}
+          path: "osrm-backend"
+
+      - name: Detect vcpkg cache key inputs
+        id: vcpkg-cache-key
+        shell: pwsh
+        run: |
+          cd C:\vcpkg
+          $vcpkgHead = git rev-parse HEAD
+          $luaCommit = ""
+          $lines = git log --oneline -- ports/lua
+          foreach ($line in $lines) {
+            if ($line -match "5\.4") {
+              $luaCommit = $line.Split()[0]
+              break
+            }
+          }
+          if (!$luaCommit) {
+            $luaCommit = "none"
+          }
+          "vcpkg_head=$vcpkgHead" >> $env:GITHUB_OUTPUT
+          "lua_port_commit=$luaCommit" >> $env:GITHUB_OUTPUT
+
+      - name: Restore vcpkg binary cache
+        if: matrix.use_vcpkg_binary_cache == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_BINARY_CACHE_DIR }}
+          key: windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-x64-windows-osrm-deps-v1
+          restore-keys: |
+            windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-x64-windows-
+            windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-
+
+      - name: Configure vcpkg binary cache
+        if: matrix.use_vcpkg_binary_cache == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:VCPKG_BINARY_CACHE_DIR" | Out-Null
+          "VCPKG_BINARY_SOURCES=clear;files,$env:VCPKG_BINARY_CACHE_DIR,readwrite" >> $env:GITHUB_ENV
+
+      - name: Install Ninja when requested
+        if: matrix.use_ninja == 'true'
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          if (!(Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y --no-progress
+          }
+          ninja --version
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "timings/${{ matrix.variant }}.md" -Value "| install ninja | $elapsed |"
+
+      - name: Patch OSRM Source (Windows)
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          python3 -c "
+          import sys, glob
+          for file in glob.glob('osrm-backend/**/*.cpp', recursive=True) + glob.glob('osrm-backend/**/*.hpp', recursive=True):
+              with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                  c = f.read()
+              c = '#include <cstdint>\n#include <chrono>\n' + c
+              if 'option_variables.contains(' in c:
+                  c = c.replace('option_variables.contains(', 'option_variables.count(')
+              if 'boost/filesystem/convenience.hpp' in c:
+                  c = c.replace('boost/filesystem/convenience.hpp', 'boost/filesystem.hpp')
+              if 'boost/geometry/multi/geometries/multi_linestring.hpp' in c:
+                  c = c.replace('boost/geometry/multi/geometries/multi_linestring.hpp', 'boost/geometry/geometries/multi_linestring.hpp')
+              with open(file, 'w', encoding='utf-8') as f:
+                  f.write(c)
+          for file in glob.glob('osrm-backend/**/CMakeLists.txt', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: c = f.read()
+                  c = c.replace('Boost::regex', '')
+                  with open(file, 'w', encoding='utf-8') as f: f.write(c)
+              except: pass
+          try:
+              with open('osrm-backend/include/server/connection.hpp', 'r', encoding='utf-8') as f: h = f.read()
+              h = '#include <chrono>\n#include <boost/asio/steady_timer.hpp>\n' + h
+              h = h.replace('boost::asio::deadline_timer', 'boost::asio::steady_timer')
+              with open('osrm-backend/include/server/connection.hpp', 'w', encoding='utf-8') as f: f.write(h)
+          except: pass
+          try:
+              with open('osrm-backend/src/server/connection.cpp', 'r', encoding='utf-8') as f: c2 = f.read()
+              c2 = '#include <chrono>\n' + c2
+              c2 = c2.replace('timer.expires_from_now(boost::posix_time::seconds(keepalive_timeout))', 'timer.expires_after(std::chrono::seconds(keepalive_timeout))')
+              c2 = c2.replace('timer.expires_from_now(boost::posix_time::seconds(0))', 'timer.expires_after(std::chrono::seconds(0))')
+              with open('osrm-backend/src/server/connection.cpp', 'w', encoding='utf-8') as f: f.write(c2)
+          except: pass
+          try:
+              with open('osrm-backend/include/server/server.hpp', 'r', encoding='utf-8') as f: s = f.read()
+              s = '#include <boost/version.hpp>\n' + s
+              old_resolve = 'boost::asio::ip::tcp::resolver::query query(address, port_string);\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);'
+              new_resolve = '#if BOOST_VERSION >= 106600\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string).begin();\n#else\n        boost::asio::ip::tcp::resolver::query query(address, port_string);\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif'
+              s = s.replace(old_resolve, new_resolve)
+              s = s.replace('boost::asio::ip::tcp::resolver::query query(address, port_string);', '#if BOOST_VERSION >= 106600\n        boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port_string).begin();\n#else\n        boost::asio::ip::tcp::resolver::query query(address, port_string);')
+              s = s.replace('boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);', 'boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);\n#endif')
+              with open('osrm-backend/include/server/server.hpp', 'w', encoding='utf-8') as f: f.write(s)
+          except: pass
+          for file in glob.glob('osrm-backend/**/sol.hpp', recursive=True):
+              try:
+                  with open(file, 'r', encoding='utf-8') as f: s2 = f.read()
+                  s2 = s2.replace('LUA_VERSION_NUM > 504', 'LUA_VERSION_NUM > 505')
+                  with open(file, 'w', encoding='utf-8') as f: f.write(s2)
+              except: pass
+          "
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "timings/${{ matrix.variant }}.md" -Value "| patch source | $elapsed |"
+
+      - name: Install Dependencies (Windows)
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          cd C:\vcpkg
+          $lines = git log --oneline -- ports/lua
+          $commit = ""
+          foreach ($line in $lines) {
+            if ($line -match "5\.4") {
+              $commit = $line.Split()[0]
+              break
+            }
+          }
+          if ($commit) {
+            Write-Host "Reverting lua port to commit $commit"
+            git checkout $commit -- ports/lua
+            if (Test-Path "versions/l/lua.json") {
+              git checkout $commit -- versions/l/lua.json
+            }
+          }
+          vcpkg install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "$env:GITHUB_WORKSPACE\timings\${{ matrix.variant }}.md" -Value "| vcpkg install | $elapsed |"
+
+      - name: Build (Windows)
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          cd osrm-backend
+          New-Item -ItemType Directory -Force -Path "build" | Out-Null
+          cd build
+          $commonArgs = @(
+            "..",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DENABLE_NODE_BINDINGS=Off",
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake",
+            "-DVCPKG_TARGET_TRIPLET=x64-windows"
+          )
+          if ("${{ matrix.use_ninja }}" -eq "true") {
+            $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+            if (!(Test-Path $vsdev)) {
+              $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+            }
+            if (!(Test-Path $vsdev)) {
+              $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+            }
+            if (!(Test-Path $vsdev)) {
+              throw "Could not find VsDevCmd.bat for Ninja/MSVC build"
+            }
+            $cmakeConfigure = "cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off -DCMAKE_TOOLCHAIN_FILE=`"$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake`" -DVCPKG_TARGET_TRIPLET=x64-windows"
+            $cmakeBuild = "cmake --build . --parallel ${{ matrix.parallelism }}"
+            @(
+              "@echo on"
+              "call `"$vsdev`" -arch=x64"
+              $cmakeConfigure
+              $cmakeBuild
+            ) | Set-Content -Path "build-ninja.cmd"
+            cmd.exe /c build-ninja.cmd
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          } else {
+            cmake @commonArgs
+            cmake --build . --config Release --parallel ${{ matrix.parallelism }}
+          }
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "$env:GITHUB_WORKSPACE\timings\${{ matrix.variant }}.md" -Value "| configure and build | $elapsed |"
+
+      - name: Package Windows output
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          $artifactName = "osrm-${{ inputs.version_tag }}-win32-x64-Release-${{ matrix.variant }}"
+          $packageDir = "package/$artifactName"
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+          $exeCopied = $false
+          foreach ($pattern in @("osrm-backend/build/Release/*.exe", "osrm-backend/build/*.exe")) {
+            if (Test-Path $pattern) {
+              Copy-Item $pattern -Destination $packageDir
+              $exeCopied = $true
+            }
+          }
+          if (!$exeCopied) {
+            throw "No OSRM executables found after build"
+          }
+
+          foreach ($pattern in @("osrm-backend/build/Release/*.dll", "osrm-backend/build/*.dll")) {
+            if (Test-Path $pattern) {
+              Copy-Item $pattern -Destination $packageDir
+            }
+          }
+          Copy-Item -Recurse "osrm-backend/profiles" -Destination $packageDir
+          if (Test-Path "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll") {
+            Copy-Item "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll" -Destination $packageDir
+          } else {
+            Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/bin/*.dll" -Destination $packageDir
+          }
+
+          $expected = @("osrm-extract.exe", "osrm-routed.exe", "osrm-contract.exe", "osrm-customize.exe", "osrm-partition.exe")
+          foreach ($exe in $expected) {
+            if (!(Test-Path "$packageDir/$exe")) {
+              throw "Missing expected executable: $exe"
+            }
+          }
+          $dllCount = @(Get-ChildItem $packageDir -Filter "*.dll").Count
+          if ($dllCount -eq 0) {
+            throw "No DLLs were bundled into the Windows package"
+          }
+
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "timings/${{ matrix.variant }}.md" -Value "| package output | $elapsed |"
+
+      - name: Run Windows sanity checks
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          $artifactName = "osrm-${{ inputs.version_tag }}-win32-x64-Release-${{ matrix.variant }}"
+          cd "package/$artifactName"
+          $packageDir = (Get-Location).Path
+          $env:PATH = "$packageDir;$env:SystemRoot\System32;$env:SystemRoot"
+          .\osrm-extract.exe --version
+          .\osrm-routed.exe --version
+          .\osrm-contract.exe --version
+          .\osrm-customize.exe --version
+          .\osrm-partition.exe --version
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "$env:GITHUB_WORKSPACE\timings\${{ matrix.variant }}.md" -Value "| sanity checks | $elapsed |"
+
+      - name: Publish timing summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "timings/${{ matrix.variant }}.md") {
+            Get-Content "timings/${{ matrix.variant }}.md" >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Upload timing summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-speed-timing-${{ inputs.version_tag }}-${{ matrix.variant }}
+          path: timings/${{ matrix.variant }}.md
+          retention-days: 14

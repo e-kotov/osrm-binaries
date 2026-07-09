@@ -341,12 +341,31 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cd osrm-backend
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
-          cmake --build . --config Release --parallel 4
+          $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          if (!(Test-Path $vsdev)) {
+            $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+          }
+          if (!(Test-Path $vsdev)) {
+            $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+          }
+          if (!(Test-Path $vsdev)) {
+            throw "Could not find VsDevCmd.bat for Ninja/MSVC build"
+          }
+          @(
+            "@echo on"
+            "call `"$vsdev`" -arch=x64"
+            "cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_NODE_BINDINGS=Off -DCMAKE_TOOLCHAIN_FILE=`"$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake`" -DVCPKG_TARGET_TRIPLET=x64-windows"
+            "cmake --build . --parallel 4"
+          ) | Set-Content -Path "build-ninja.cmd"
+          cmd.exe /c build-ninja.cmd
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Package Artifacts (Unix)
         if: runner.os != 'Windows'
@@ -487,8 +506,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "package/${{ matrix.artifact_name }}"
-          Copy-Item "osrm-backend/build/Release/*.exe" -Destination "package/${{ matrix.artifact_name }}/"
-          if (Test-Path "osrm-backend/build/Release/*.dll") { Copy-Item "osrm-backend/build/Release/*.dll" -Destination "package/${{ matrix.artifact_name }}/" }
+          $exeCopied = $false
+          foreach ($pattern in @("osrm-backend/build/Release/*.exe", "osrm-backend/build/*.exe")) {
+            if (Test-Path $pattern) {
+              Copy-Item $pattern -Destination "package/${{ matrix.artifact_name }}/"
+              $exeCopied = $true
+            }
+          }
+          if (!$exeCopied) {
+            throw "No OSRM executables found after build"
+          }
+          foreach ($pattern in @("osrm-backend/build/Release/*.dll", "osrm-backend/build/*.dll")) {
+            if (Test-Path $pattern) {
+              Copy-Item $pattern -Destination "package/${{ matrix.artifact_name }}/"
+            }
+          }
           Copy-Item -Recurse "osrm-backend/profiles" -Destination "package/${{ matrix.artifact_name }}/"
           if (Test-Path "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll") {
               Copy-Item "osrm-backend/build/vcpkg_installed/x64-windows/bin/*.dll" -Destination "package/${{ matrix.artifact_name }}/"

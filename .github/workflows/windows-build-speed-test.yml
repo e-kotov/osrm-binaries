@@ -107,7 +107,7 @@ jobs:
           "VCPKG_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
           "VCPKG_INSTALLATION_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
           $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
-          Add-Content -Path "timings/${{ matrix.variant }}.md" -Value "| setup pinned vcpkg | $elapsed |"
+          Add-Content -Path "$env:GITHUB_WORKSPACE\timings\${{ matrix.variant }}.md" -Value "| setup pinned vcpkg | $elapsed |"
 
       - name: Detect vcpkg cache key inputs
         id: vcpkg-cache-key

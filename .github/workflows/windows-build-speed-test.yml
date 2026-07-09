@@ -21,6 +21,8 @@ permissions:
 
 env:
   VCPKG_BINARY_CACHE_DIR: ${{ github.workspace }}\vcpkg-binary-cache
+  VCPKG_ROOT: ${{ github.workspace }}\vcpkg-pinned
+  VCPKG_COMMIT: 42e4e33e1505c9f47b58c21e0f557c1571b751ee
 
 jobs:
   windows-build:
@@ -65,6 +67,7 @@ jobs:
             "- Ninja: ${{ matrix.use_ninja }}"
             "- Parallelism: ${{ matrix.parallelism }}"
             "- vcpkg binary cache: ${{ matrix.use_vcpkg_binary_cache }}"
+            "- vcpkg commit: ${{ env.VCPKG_COMMIT }}"
             ""
             "| Phase | Seconds |"
             "| --- | ---: |"
@@ -81,6 +84,7 @@ jobs:
           } else {
             Write-Host "Ninja is not currently on PATH"
           }
+          Write-Host "Pinned vcpkg commit: $env:VCPKG_COMMIT"
 
       - name: Checkout upstream OSRM
         uses: actions/checkout@v4
@@ -89,11 +93,27 @@ jobs:
           ref: ${{ inputs.version_tag }}
           path: "osrm-backend"
 
+      - name: Setup pinned vcpkg
+        shell: pwsh
+        run: |
+          $start = Get-Date
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$env:VCPKG_ROOT"
+          cd "$env:VCPKG_ROOT"
+          git checkout "$env:VCPKG_COMMIT"
+          .\bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          "VCPKG_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
+          "VCPKG_INSTALLATION_ROOT=$env:VCPKG_ROOT" >> $env:GITHUB_ENV
+          $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
+          Add-Content -Path "timings/${{ matrix.variant }}.md" -Value "| setup pinned vcpkg | $elapsed |"
+
       - name: Detect vcpkg cache key inputs
         id: vcpkg-cache-key
         shell: pwsh
         run: |
-          cd C:\vcpkg
+          cd "$env:VCPKG_ROOT"
           $vcpkgHead = git rev-parse HEAD
           $luaCommit = ""
           $lines = git log --oneline -- ports/lua
@@ -199,7 +219,7 @@ jobs:
         shell: pwsh
         run: |
           $start = Get-Date
-          cd C:\vcpkg
+          cd "$env:VCPKG_ROOT"
           $lines = git log --oneline -- ports/lua
           $commit = ""
           foreach ($line in $lines) {
@@ -215,7 +235,7 @@ jobs:
               git checkout $commit -- versions/l/lua.json
             }
           }
-          vcpkg install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
+          .\vcpkg install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
           $elapsed = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
           Add-Content -Path "$env:GITHUB_WORKSPACE\timings\${{ matrix.variant }}.md" -Value "| vcpkg install | $elapsed |"
 

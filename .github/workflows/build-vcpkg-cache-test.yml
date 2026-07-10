@@ -306,17 +306,37 @@ jobs:
           if (!$luaPortCommit) {
               throw "Could not find Lua 5.4 port commit in pinned vcpkg checkout"
           }
+          $manifestFiles = @(
+              "$env:GITHUB_WORKSPACE\osrm-backend\vcpkg.json",
+              "$env:GITHUB_WORKSPACE\osrm-backend\vcpkg-configuration.json"
+          ) | Where-Object { Test-Path $_ }
+          if ($manifestFiles.Count -gt 0) {
+              $hashInput = ""
+              foreach ($file in ($manifestFiles | Sort-Object)) {
+                  $hashInput += "$(Split-Path -Leaf $file)`n"
+                  $hashInput += Get-Content -Raw $file
+                  $hashInput += "`n"
+              }
+              $sha256 = [System.Security.Cryptography.SHA256]::Create()
+              $bytes = [System.Text.Encoding]::UTF8.GetBytes($hashInput)
+              $manifestHash = [BitConverter]::ToString($sha256.ComputeHash($bytes)).Replace("-", "").ToLowerInvariant()
+          } else {
+              $manifestHash = "no-manifest"
+          }
           "vcpkg_head=$vcpkgHead" >> $env:GITHUB_OUTPUT
           "lua_port_commit=$luaPortCommit" >> $env:GITHUB_OUTPUT
+          "manifest_hash=$manifestHash" >> $env:GITHUB_OUTPUT
 
       - name: Restore vcpkg binary cache (Windows)
         if: runner.os == 'Windows'
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_BINARY_CACHE_DIR }}
-          key: windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-x64-windows-osrm-deps-v1
+          key: windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-${{ steps.vcpkg-cache-key.outputs.manifest_hash }}-x64-windows-osrm-deps-v2
           restore-keys: |
+            windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-${{ steps.vcpkg-cache-key.outputs.manifest_hash }}-x64-windows-
             windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-x64-windows-
+            windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-${{ steps.vcpkg-cache-key.outputs.lua_port_commit }}-
             windows-vcpkg-binary-${{ steps.vcpkg-cache-key.outputs.vcpkg_head }}-
 
       - name: Configure vcpkg binary cache (Windows)
@@ -340,6 +360,24 @@ jobs:
               }
           }
           .\vcpkg.exe install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
+
+      - name: Prewarm vcpkg manifest dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $manifestRoot = Join-Path $env:GITHUB_WORKSPACE "osrm-backend"
+          $manifestFile = Join-Path $manifestRoot "vcpkg.json"
+          if (!(Test-Path $manifestFile)) {
+              Write-Host "No vcpkg manifest found; skipping manifest prewarm."
+              exit 0
+          }
+          $buildDir = Join-Path $manifestRoot "build"
+          $installRoot = Join-Path $buildDir "vcpkg_installed"
+          New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+          & "$env:VCPKG_ROOT\vcpkg.exe" install `
+              --triplet x64-windows `
+              --x-manifest-root="$manifestRoot" `
+              --x-install-root="$installRoot"
 
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
@@ -381,7 +419,7 @@ jobs:
         shell: pwsh
         run: |
           cd osrm-backend
-          mkdir build
+          New-Item -ItemType Directory -Force -Path build | Out-Null
           cd build
           $vsdev = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           if (!(Test-Path $vsdev)) {

@@ -739,11 +739,26 @@ jobs:
           find . -name "*.tar.gz" -exec shasum -a 256 {} + | sed 's|^\([a-f0-9]*\)  .*/\([^/]*\)$|\1  \2|' > checksums.txt
           cat checksums.txt
 
+      - name: Generate Release Notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.version_tag || github.ref_name }}"
+          cat > release-notes.md <<EOF
+          OSRM backend binaries built from upstream OSRM ${tag}.
+
+          Upstream OSRM release notes and source tag:
+          https://github.com/Project-OSRM/osrm-backend/releases/tag/${tag}
+
+          This release includes standalone archives for Linux, macOS, and Windows. SHA-256 checksums are available in \`checksums.txt\` and as GitHub release asset digests.
+          EOF
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.version_tag != ''
         with:
           tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
+          body_path: release-notes.md
           files: |
             artifacts/**/*.tar.gz
             artifacts/checksums.txt

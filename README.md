@@ -10,6 +10,10 @@ release tags and are primarily maintained to support the
 They can also be downloaded and used directly by other tools that need the OSRM
 backend executables.
 
+Compared with the official upstream release artifacts, these archives are built
+with the R package use case in mind: backend executables, predictable asset
+names, checksum verification, and bundled runtime libraries where practical.
+
 ## What These Releases Contain
 
 Each release provides standalone archives for supported platforms:
@@ -32,6 +36,34 @@ These are backend binary releases. They do not package the upstream Node.js
 bindings, npm package metadata, or `node_osrm` artifacts. This repository is not
 intended to replace the official OSRM Node.js distribution; it provides the
 backend command-line tools needed by the R package and similar workflows.
+
+## Portable Runtime Packaging
+
+The release workflow aims to make the archives portable enough to run on normal
+user machines without asking users to install the full OSRM build toolchain.
+
+For Linux, binaries are currently built on GitHub-hosted Ubuntu 24.04 runners
+for `x64` and `arm64`. During packaging, the workflow bundles the dynamic Boost
+and TBB libraries used by the OSRM executables and rewrites the executable RPATH
+to load those libraries from the archive directory. The release test job audits
+the packaged executables with `ldd` and fails if required Boost or TBB runtime
+libraries are still resolved from outside the package.
+
+This matters because upstream OSRM release artifacts may move to newer build
+images over time. When binaries are built on a newer Linux distribution without
+bundling the right runtime libraries, they can stop working on older Linux
+systems. Our goal is to reduce that problem for R package users by packaging the
+runtime libraries that are most likely to cause this kind of breakage.
+
+The Linux archives are not claimed to be universal static binaries. They still
+depend on core system libraries such as glibc and the platform loader provided
+by the host OS. Within that constraint, the workflow is designed and tested to
+be as self-contained as practical.
+
+On macOS and Windows, the workflow follows the same portability principle:
+Homebrew/vcpkg runtime libraries needed by the shipped executables are copied
+into the archive, and the package test jobs check that the executables can start
+from the extracted package.
 
 ## Why This Repository Exists
 

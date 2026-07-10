@@ -341,6 +341,7 @@ jobs:
 
       - name: Restore vcpkg binary cache (Windows)
         if: runner.os == 'Windows'
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_BINARY_CACHE_DIR }}
@@ -373,10 +374,19 @@ jobs:
           }
           .\vcpkg.exe install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
 
-      - name: Prewarm vcpkg manifest dependencies (Windows)
+      "- name: Prewarm vcpkg manifest dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Skip manifest prewarm if a vcpkg binary cache was restored (directory contains files).
+          $cacheDir = $env:VCPKG_BINARY_CACHE_DIR
+          if (Test-Path $cacheDir) {
+              $anyFile = Get-ChildItem -Path $cacheDir -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($anyFile) {
+                  Write-Host "Binary cache directory '$cacheDir' contains files; skipping manifest prewarm."
+                  exit 0
+              }
+          }
           $manifestRoot = Join-Path $env:GITHUB_WORKSPACE "osrm-backend"
           $manifestFile = Join-Path $manifestRoot "vcpkg.json"
           if (!(Test-Path $manifestFile)) {
@@ -390,7 +400,7 @@ jobs:
               --triplet x64-windows `
               --x-manifest-root="$manifestRoot" `
               --x-install-root="$installRoot"
-
+"
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
         run: |

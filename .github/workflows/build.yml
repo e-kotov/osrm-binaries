@@ -744,8 +744,34 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ github.event.inputs.version_tag || github.ref_name }}"
+          upstream_published_at="$(python3 - "$tag" <<'PY'
+          import datetime
+          import json
+          import sys
+          import urllib.request
+
+          tag = sys.argv[1]
+          url = f"https://api.github.com/repos/Project-OSRM/osrm-backend/releases/tags/{tag}"
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "osrm-binaries-release-workflow",
+              },
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  published_at = json.load(response).get("published_at", "")
+              dt = datetime.datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+              print(dt.strftime("%Y-%m-%d %H:%M UTC"))
+          except Exception:
+              print("unknown")
+          PY
+          )"
           cat > release-notes.md <<EOF
           OSRM backend binaries built from upstream OSRM ${tag}.
+
+          Original upstream OSRM release date: ${upstream_published_at}
 
           Upstream OSRM release notes and source tag:
           https://github.com/Project-OSRM/osrm-backend/releases/tag/${tag}

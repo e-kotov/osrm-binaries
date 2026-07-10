@@ -1,9 +1,9 @@
 name: Build and Release OSRM Binaries
 
-run-name: Build ${{ inputs.version_tag }}
+run-name: Build ${{ github.event.inputs.version_tag || github.ref_name }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.version_tag }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.version_tag || github.ref_name }}
   cancel-in-progress: false
 
 on:
@@ -374,7 +374,7 @@ jobs:
           }
           .\vcpkg.exe install bzip2 boost expat stxxl lua tbb libarchive libzip --triplet x64-windows
 
-      "- name: Prewarm vcpkg manifest dependencies (Windows)
+      - name: Prewarm vcpkg manifest dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -400,7 +400,6 @@ jobs:
               --triplet x64-windows `
               --x-manifest-root="$manifestRoot" `
               --x-install-root="$installRoot"
-"
       - name: Build (Linux / macOS)
         if: runner.os != 'Windows'
         run: |

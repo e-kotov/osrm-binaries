@@ -60,6 +60,14 @@ depend on core system libraries such as glibc and the platform loader provided
 by the host OS. Within that constraint, the workflow is designed and tested to
 be as self-contained as practical.
 
+The effective Linux compatibility floor is the highest `GLIBC_*` symbol required
+by the packaged executables and bundled shared libraries. For example, the
+published `v26.7.3` Linux `x64` and `arm64` archives currently require symbols
+up to `GLIBC_2.38`. Systems with an older glibc than that are not expected to run
+those archives. Future releases may have a different floor depending on the
+build image, compiler, and bundled library versions, so compatibility should be
+checked per release when supporting older Linux distributions matters.
+
 On macOS and Windows, the workflow follows the same portability principle:
 Homebrew/vcpkg runtime libraries needed by the shipped executables are copied
 into the archive, and the package test jobs check that the executables can start
@@ -87,9 +95,13 @@ explicitly documented new asset/versioning strategy.
 Release notes link back to the corresponding upstream OSRM release so users can
 inspect the original OSRM changelog and source tag.
 
-New stable upstream OSRM releases are checked automatically once per day. When a
-new upstream stable tag appears, this repository dispatches the binary build
-workflow for that tag. Older historical tags are not backfilled automatically.
+New stable upstream OSRM releases are checked automatically once per day at
+00:17 UTC. When a new upstream stable tag appears after the current baseline,
+this repository dispatches the binary build workflow for that tag. That means
+new releases here are not published at exactly the same moment as upstream OSRM;
+they are normally picked up by the next daily check and then published after the
+platform build and package tests complete. Older historical tags are not
+backfilled automatically.
 
 ## Checksums
 

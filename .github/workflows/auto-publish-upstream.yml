@@ -1,0 +1,91 @@
+name: Auto Publish Upstream Releases
+
+run-name: Check upstream OSRM releases
+
+on:
+  schedule:
+    - cron: '17 0 * * *' # daily at 00:17 UTC
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+env:
+  UPSTREAM_REPO: Project-OSRM/osrm-backend
+  BASELINE_TAG: v26.7.3
+  TARGET_WORKFLOW: build.yml
+  TARGET_REF: main
+
+jobs:
+  check-and-dispatch:
+    name: Check upstream and dispatch builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find missing future upstream tags
+        id: missing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${UPSTREAM_REPO}/releases" --paginate --jq '.[].tag_name' > upstream-tags.txt
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[].tag_name' > target-tags.txt
+
+          python3 - <<'PY'
+          import os
+          import re
+
+          def stable_version(tag):
+              match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag)
+              if not match:
+                  return None
+              return tuple(int(part) for part in match.groups())
+
+          with open("upstream-tags.txt", encoding="utf-8") as handle:
+              upstream_tags = [line.strip() for line in handle if line.strip()]
+          with open("target-tags.txt", encoding="utf-8") as handle:
+              target_tags = {line.strip() for line in handle if line.strip()}
+
+          baseline = stable_version(os.environ["BASELINE_TAG"])
+          if baseline is None:
+              raise SystemExit(f"Invalid BASELINE_TAG: {os.environ['BASELINE_TAG']}")
+
+          missing = []
+          for tag in upstream_tags:
+              version = stable_version(tag)
+              if version is None or version <= baseline or tag in target_tags:
+                  continue
+              missing.append(tag)
+
+          missing.sort(key=stable_version)
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8") as output:
+              print(f"count={len(missing)}", file=output)
+              print(f"tags={' '.join(missing)}", file=output)
+          print(f"Missing future stable tags after {os.environ['BASELINE_TAG']}: {' '.join(missing) or '(none)'}")
+          PY
+
+      - name: Dispatch build workflow
+        if: steps.missing.outputs.count != '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAGS: ${{ steps.missing.outputs.tags }}
+        run: |
+          set -euo pipefail
+          for tag in $TAGS; do
+            echo "Dispatching ${TARGET_WORKFLOW} for ${tag}"
+            gh workflow run "${TARGET_WORKFLOW}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --ref "${TARGET_REF}" \
+              -f "version_tag=${tag}"
+          done
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Baseline tag: ${BASELINE_TAG}"
+          echo "Missing future stable tag count: ${{ steps.missing.outputs.count }}"
+          echo "Dispatched tags: ${{ steps.missing.outputs.tags }}"
